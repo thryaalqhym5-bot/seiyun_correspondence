@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "854370715125",
+    "project_id": "seiyun-university-system",
+    "storage_bucket": "seiyun-university-system.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:854370715125:android:534b1294a2f30642924cbc",
+        "android_client_info": {
+          "package_name": "com.example.seiyun_correspondence"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBtAzoIxhvL_Dj0e1prBDzQJt3ILa3XxsA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

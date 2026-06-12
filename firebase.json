@@ -1,0 +1,34 @@
+{
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  },
+  "functions": {
+    "source": "functions"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "seiyun-university-system",
+          "appId": "1:854370715125:android:534b1294a2f30642924cbc",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "seiyun-university-system",
+          "configurations": {
+            "android": "1:854370715125:android:534b1294a2f30642924cbc",
+            "ios": "1:854370715125:ios:da32a1ca0943d2c0924cbc",
+            "macos": "1:854370715125:ios:da32a1ca0943d2c0924cbc",
+            "web": "1:854370715125:web:96f4527c6ee57df2924cbc",
+            "windows": "1:854370715125:web:dd39fc40bf7c2b1b924cbc"
+          }
+        }
+      }
+    }
+  }
+}

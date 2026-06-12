@@ -1,0 +1,53 @@
+rules_version = '2';
+
+// مسودة قواعد حماية التخزين السحابي (Firebase Storage)
+// تمنع رفع أي ملفات مشبوهة وتحد من أحجام الملفات للوقاية من هجمات إنهاك المساحة (Storage Exhaustion)
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // المرفقات الخاصة بالمراسلات
+    match /communications/attachments/{commId}/{fileName} {
+      
+      // القراءة: لأي مستخدم مسجل الدخول (يمكن تقييدها بالمشاركين فقط، لكن يحتاج ذلك Custom Claims أو صلاحيات على مستوى Firestore)
+      allow read: if request.auth != null;
+
+      // الرفع:
+      allow create: if request.auth != null
+                   // الحد الأقصى لحجم الملف هو 20 ميجابايت لمنع هجمات الإغراق
+                   && request.resource.size < 20 * 1024 * 1024
+                   // تحديد أنواع الملفات المسموحة (PDF، صور، مستندات Word/Excel) لمنع رفع سكريبتات أو ملفات تنفيذية
+                   && request.resource.contentType.matches('application/pdf|image/.*|application/msword|application/vnd.openxmlformats-officedocument.wordprocessingml.document|application/vnd.ms-excel|application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      
+      // التعديل: ممنوع نهائياً لمنع استبدال المرفقات الأصلية بمرفقات مزورة
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // التواقيع والأختام
+    match /signatures/{userId}/{fileName} {
+      // فقط المستخدم نفسه يمكنه قراءة وتحديث توقيعه
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create, update: if request.auth != null 
+                         && request.auth.uid == userId
+                         && request.resource.size < 5 * 1024 * 1024 // التوقيع بحد أقصى 5 ميجابايت
+                         && request.resource.contentType.matches('image/.*'); // صور فقط
+      allow delete: if false; // لا حاجة للحذف
+    }
+
+    // الصور الشخصية
+    match /avatars/{userId}/{fileName} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null 
+                   && request.auth.uid == userId
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if false;
+    }
+
+    // حظر عام لبقية المسارات
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

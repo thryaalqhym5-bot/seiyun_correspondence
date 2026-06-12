@@ -1,0 +1,191 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =====================================================
+    // دوال مساعدة (Helper Functions)
+    // =====================================================
+
+    /// التحقق من أن المستخدم مسجل الدخول
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    /// التحقق من أن المستخدم هو صاحب الوثيقة
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    /// التحقق من أن المستخدم مشارك في المراسلة (مرسل أو مستقبل حالي أو ضمن المستلمين)
+    function isCommunicationParticipant(resourceData) {
+      return isAuthenticated() && (
+        resourceData.sender_id == request.auth.uid || 
+        resourceData.current_rcv_id == request.auth.uid ||
+        (resourceData.recipient_ids != null && request.auth.uid in resourceData.recipient_ids) ||
+        (resourceData.cc_ids != null && request.auth.uid in resourceData.cc_ids)
+      );
+    }
+
+    /// التحقق من أن المستخدم لديه صلاحيات إدارية (Admin)
+    function isAdmin() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // =====================================================
+    // 1. المستخدمون (Users & Authentication)
+    // =====================================================
+
+    match /users/{userId} {
+      // أي مستخدم مسجل يمكنه قراءة الملفات الشخصية (مطلوب للتوجيه)
+      allow read: if isAuthenticated();
+      
+      // الأدمن يفعل ما يشاء
+      allow create, delete: if isAdmin();
+      
+      // المستخدم الجديد يستطيع إنشاء ملفه الشخصي، شرط ألا يمنح نفسه صلاحية أدمن
+      allow create: if isOwner(userId) && request.resource.data.role != 'admin';
+      
+      // المستخدم يعدل ملفه الشخصي فقط، ويُمنع من تعديل الحقول الحساسة
+      allow update: if isAdmin() || (
+        isOwner(userId) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'role', 'is_active', 'uid', 'manager_id', 'college_id', 
+          'dept_id', 'administrative_title', 'secondary_administrative_title'
+        ])
+      );
+    }
+
+    match /allowed_users/{docId} {
+      // أي مستخدم مسجل يقرأ قائمة المسموح لهم
+      allow read: if isAuthenticated();
+      
+      // الكتابة مقيّدة للأدمن فقط
+      allow create, delete: if isAdmin();
+      
+      // السماح للمستخدم بتحديث حقل التسجيل الخاص به فقط عند الدخول لأول مرة
+      allow update: if isAdmin() || (
+        isAuthenticated() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['is_registered']) &&
+        request.resource.data.is_registered == true
+      );
+    }
+
+    // =====================================================
+    // 2. المراسلات (Communications — البيانات الأساسية)
+    // =====================================================
+
+    match /communications/{commId} {
+      // القراءة: فقط المشاركون في المراسلة، أو التعاميم المنشورة للجميع
+      allow read: if isCommunicationParticipant(resource.data) || 
+                     (resource.data.is_circular == true && resource.data.status == 'published');
+      
+      // الإنشاء: مستخدم مسجل + sender_id يساوي uid الحالي
+      allow create: if isAuthenticated() 
+        && request.resource.data.sender_id == request.auth.uid;
+      
+      // التعديل: المستقبل الحالي أو المرسل فقط
+      // ✅ الإصلاح C-17: لا يمكن تغيير sender_id عند التعديل
+      allow update: if isAuthenticated() && (
+        resource.data.current_rcv_id == request.auth.uid || 
+        resource.data.sender_id == request.auth.uid
+      ) && (
+        // منع تغيير هوية المرسل الأصلي
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['sender_id'])
+        || resource.data.sender_id == request.auth.uid
+      );
+      
+      // الحذف: المرسل فقط
+      allow delete: if isAuthenticated() && resource.data.sender_id == request.auth.uid;
+
+      // سجل التتبع (Tracking Subcollection)
+      match /tracking/{trackingId} {
+        // السجل (Tracking) هو سجل تدقيق غير قابل للتعديل أو الحذف (Append-Only)
+        allow read, create: if isCommunicationParticipant(
+          get(/databases/$(database)/documents/communications/$(commId)).data
+        );
+      }
+    }
+
+    // =====================================================
+    // 3. البيانات الهيكلية (Structure & Master Data)
+    // =====================================================
+
+    match /colleges/{collegeId} {
+      allow read: if isAuthenticated();
+      // الأدمن فقط يعدّل الكليات
+      allow write: if isAdmin();
+    }
+
+    match /departments/{deptId} {
+      allow read: if isAuthenticated();
+      // الأدمن فقط يعدّل الأقسام
+      allow write: if isAdmin();
+    }
+
+    // =====================================================
+    // 4. الأرشيف (Archive Folders)
+    // =====================================================
+
+    match /archive_folders/{folderId} {
+      allow read: if isAuthenticated();
+      // ✅ الإصلاح C-18: التعديل مقيّد بالحقول المسموح بها فقط
+      // السماح بتحديث current_sequence و last_sequence_year (للمعاملات الذرية)
+      // + folder_name و folder_number (لإدارة الأدمن)
+      allow update: if isAuthenticated() && (
+        // التعديل العادي من Transaction (توليد الأرقام المرجعية)
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['current_sequence', 'last_sequence_year', 'updated_at'])
+        // أو تعديل كامل من الأدمن
+        || isAdmin()
+      );
+      // الإنشاء والحذف للأدمن فقط
+      allow create: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // =====================================================
+    // 5. القوالب (Templates)
+    // =====================================================
+
+    match /templates/{templateId} {
+      allow read: if isAuthenticated();
+      // ✅ الإصلاح C-19: الأدمن فقط يعدّل القوالب الرسمية
+      allow write: if isAdmin();
+    }
+
+    // =====================================================
+    // 6. التذكيرات والتفويضات (Reminders & Delegations)
+    // =====================================================
+
+    match /user_reminders/{reminderId} {
+      // الإنشاء: أي مستخدم مسجل ينشئ تذكيراته
+      allow create: if isAuthenticated() 
+        && request.resource.data.user_id == request.auth.uid;
+      // القراءة والتعديل: صاحب التذكير فقط
+      allow read, update, delete: if isAuthenticated() 
+        && resource.data.user_id == request.auth.uid;
+    }
+
+    match /delegations/{delegationId} {
+      // السماح بالقراءة لجميع المستخدمين المسجلين حتى يعمل محرك التوجيه (RoutingService)
+      allow read: if isAuthenticated();
+      // الإنشاء: المفوِّض فقط
+      allow create: if isAuthenticated() 
+        && request.resource.data.delegator_id == request.auth.uid;
+      // التعديل والحذف: المفوِّض فقط
+      allow update, delete: if isAuthenticated() 
+        && resource.data.delegator_id == request.auth.uid;
+    }
+
+    // =====================================================
+    // 7. الإعدادات (Settings)
+    // =====================================================
+
+    match /settings/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+  }
+}
