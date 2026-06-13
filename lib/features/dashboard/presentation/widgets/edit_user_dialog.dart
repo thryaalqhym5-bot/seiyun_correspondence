@@ -76,8 +76,8 @@ class _EditUserDialogState extends State<EditUserDialog> {
   Future<void> handleSave() async {
     final fullName = fullNameController.text.trim();
 
-    if (fullName.isEmpty || _affiliations.isEmpty || _affiliations.any((a) => (a['college_id'] as String).isEmpty)) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('الاسم ومعرف الكلية لكل منصب مطلوبة')));
+    if (fullName.isEmpty || _affiliations.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('الاسم الكامل والمناصب مطلوبة')));
       return;
     }
 
@@ -185,12 +185,15 @@ class _EditUserDialogState extends State<EditUserDialog> {
                             if (!snapshot.hasData) return const CircularProgressIndicator();
                             final docs = snapshot.data!.docs;
                             return DropdownButtonFormField<String>(
-                              value: (aff['college_id'] as String).isNotEmpty && docs.any((doc) => doc.id == aff['college_id']) ? aff['college_id'] : null,
+                              value: docs.any((doc) => doc.id == aff['college_id']) ? aff['college_id'] : '',
                               decoration: const InputDecoration(labelText: 'الجهة (رئاسة الجامعة / الكلية)', border: OutlineInputBorder()),
                               dropdownColor: const Color(0xFF112240),
                               style: const TextStyle(color: Colors.white),
                               isExpanded: true,
-                              items: docs.map((doc) => DropdownMenuItem(value: doc.id, child: Text(doc['name'] ?? ''))).toList(),
+                              items: [
+                                const DropdownMenuItem(value: '', child: Text('رئاسة الجامعة')),
+                                ...docs.map((doc) => DropdownMenuItem(value: doc.id, child: Text(doc['name'] ?? ''))),
+                              ],
                               onChanged: (val) {
                                 if (val != null) setState(() => _affiliations[index]['college_id'] = val);
                               },
