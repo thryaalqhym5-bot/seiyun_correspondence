@@ -16,6 +16,7 @@ class PdfSecurityUtils {
     String? digitalSignature,
     String? senderSignatureUrl,
     String? senderSealUrl,
+    bool skipWatermark = false,
   }) async {
     try {
       // 1. قراءة الـ PDF الأصلي
@@ -125,23 +126,25 @@ class PdfSecurityUtils {
         final PdfGraphics graphics = page.graphics;
 
         // --- إضافة العلامة المائية (Watermark) ---
-        graphics.save(); // حفظ الحالة الحالية
-        graphics.setTransparency(0.2); // جعلها شفافة (20% وضوح)
-        
-        graphics.translateTransform(pageSize.width / 2, pageSize.height / 2);
-        graphics.rotateTransform(-45);
-        
-        graphics.drawString(
-          'Opener: $userName', 
-          watermarkFont,
-          pen: PdfPen(PdfColor(255, 0, 0)), 
-          brush: PdfBrushes.red,
-          format: PdfStringFormat(
-            alignment: PdfTextAlignment.center,
-            lineAlignment: PdfVerticalAlignment.middle,
-          ),
-        );
-        graphics.restore(); // العودة للحالة الأصلية
+        if (!skipWatermark) {
+          graphics.save(); // حفظ الحالة الحالية
+          graphics.setTransparency(0.2); // جعلها شفافة (20% وضوح)
+          
+          graphics.translateTransform(pageSize.width / 2, pageSize.height / 2);
+          graphics.rotateTransform(-45);
+          
+          graphics.drawString(
+            'Opener: $userName', 
+            watermarkFont,
+            pen: PdfPen(PdfColor(255, 0, 0)), 
+            brush: PdfBrushes.red,
+            format: PdfStringFormat(
+              alignment: PdfTextAlignment.center,
+              lineAlignment: PdfVerticalAlignment.middle,
+            ),
+          );
+          graphics.restore(); // العودة للحالة الأصلية
+        }
 
         // --- إضافة رقم الوثيقة والباركود أسفل الصفحة ---
         // رسم الباركود كصورة (في كل الصفحات)

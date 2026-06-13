@@ -5,6 +5,8 @@ import '../../../../core/widgets/app_card.dart';
 import '../../../../core/models/communication_model.dart';
 import '../../../../core/services/communication_service.dart';
 import '../viewmodels/communications_viewmodel.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'create_communication_page.dart';
 
 class ExternalInboxPage extends StatefulWidget {
@@ -20,6 +22,25 @@ class _ExternalInboxPageState extends State<ExternalInboxPage> {
   CommunicationModel? _selectedMessage;
   String _searchQuery = '';
   bool _isActionLoading = false;
+  String _userTitle = 'staff';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserRole();
+  }
+
+  Future<void> _loadUserRole() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      if (doc.exists && mounted) {
+        setState(() {
+          _userTitle = doc.data()?['administrative_title'] ?? 'staff';
+        });
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -225,10 +246,10 @@ class _ExternalInboxPageState extends State<ExternalInboxPage> {
                                     ),
                                   ),
                                   _buildBadge(
-                                    msg.status == 'external_pending'
+                                    msg.status == 'archived'
                                         ? 'جديد'
                                         : 'تمت المراجعة',
-                                    msg.status == 'external_pending'
+                                    msg.status == 'archived'
                                         ? Colors.orangeAccent
                                         : Colors.greenAccent,
                                   ),
@@ -249,11 +270,33 @@ class _ExternalInboxPageState extends State<ExternalInboxPage> {
                               if (msg.referenceNumber != null &&
                                   msg.referenceNumber!.isNotEmpty) ...[
                                 const SizedBox(height: 4),
-                                Text(
-                                  'المرجع: ${msg.referenceNumber}',
-                                  style: TextStyle(
-                                      color: Colors.white.withValues(alpha: 0.4),
-                                      fontSize: 11),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.confirmation_number_outlined,
+                                        size: 14, color: Colors.white54),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'رقم القيد: ${msg.referenceNumber}',
+                                      style: const TextStyle(
+                                          color: Colors.white54, fontSize: 12),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                              if (msg.externalReferenceNumber != null &&
+                                  msg.externalReferenceNumber!.isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.tag,
+                                        size: 14, color: Colors.white54),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'المرجع الخارجي: ${msg.externalReferenceNumber}',
+                                      style: const TextStyle(
+                                          color: Colors.white54, fontSize: 12),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ],
@@ -331,7 +374,11 @@ class _ExternalInboxPageState extends State<ExternalInboxPage> {
                     if (msg.referenceNumber != null &&
                         msg.referenceNumber!.isNotEmpty)
                       _buildInfoChip(
-                          Icons.tag, 'المرجع', msg.referenceNumber!),
+                          Icons.confirmation_number_outlined, 'رقم القيد', msg.referenceNumber!),
+                    if (msg.externalReferenceNumber != null &&
+                        msg.externalReferenceNumber!.isNotEmpty)
+                      _buildInfoChip(
+                          Icons.tag, 'المرجع الخارجي', msg.externalReferenceNumber!),
                     if (msg.documentDate != null &&
                         msg.documentDate!.isNotEmpty)
                       _buildInfoChip(
@@ -346,8 +393,9 @@ class _ExternalInboxPageState extends State<ExternalInboxPage> {
             child: _buildDocumentPreview(msg),
           ),
           // ===== Action Bar =====
-          if (msg.status == 'external_pending' ||
-              msg.status == 'external_reviewed')
+          if (msg.status == 'archived' ||
+              msg.status == 'external_reviewed' ||
+              msg.status == 'external_pending')
             _buildActionBar(msg),
         ],
       ),
@@ -652,7 +700,29 @@ class _ExternalInboxPageState extends State<ExternalInboxPage> {
   }
 
   Future<void> _showCirculateDialog(CommunicationModel msg) async {
-    String targetGroup = 'college'; // default
+    List<DropdownMenuItem<String>> items = [];
+    
+    if (['university_president', 'university_vp', 'general_secretary'].contains(_userTitle)) {
+      items = const [
+        DropdownMenuItem(value: 'all_university', child: Text('كل منسوبي الجامعة')),
+        DropdownMenuItem(value: 'all_deans', child: Text('عمداء الكليات ومدراء المراكز')),
+      ];
+    } else if (['dean', 'vice_dean', 'vice_dean_student', 'vice_dean_academic', 'vice_dean_postgraduate', 'center_director', 'vice_director', 'general_director'].contains(_userTitle)) {
+      items = const [
+        DropdownMenuItem(value: 'all_college', child: Text('كل منسوبي الكلية/المركز')),
+        DropdownMenuItem(value: 'college_management', child: Text('رؤساء الأقسام والإدارات فقط')),
+      ];
+    } else if (_userTitle == 'head_of_department') {
+      items = const [
+        DropdownMenuItem(value: 'all_department', child: Text('كل منسوبي القسم')),
+      ];
+    } else {
+      items = const [
+        DropdownMenuItem(value: 'all_college', child: Text('كل المنسوبين')),
+      ];
+    }
+
+    String targetGroup = items.first.value!;
     final commentController = TextEditingController();
 
     if (!mounted) return;
@@ -691,16 +761,9 @@ class _ExternalInboxPageState extends State<ExternalInboxPage> {
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide.none),
                   ),
-                  items: const [
-                    DropdownMenuItem(
-                        value: 'college',
-                        child: Text('كل منسوبي الكلية')),
-                    DropdownMenuItem(
-                        value: 'heads_only',
-                        child: Text('رؤساء الأقسام فقط')),
-                  ],
+                  items: items,
                   onChanged: (v) =>
-                      setDialogState(() => targetGroup = v ?? 'college'),
+                      setDialogState(() => targetGroup = v ?? items.first.value!),
                 ),
                 const SizedBox(height: 16),
                 const Text('ملاحظة (اختياري):',

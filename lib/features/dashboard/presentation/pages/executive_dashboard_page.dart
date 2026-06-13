@@ -215,8 +215,6 @@ class _ExecutiveDashboardPageState extends State<ExecutiveDashboardPage> {
                 ],
               ),
             ),
-            const SizedBox(height: 24),
-            _buildStatsRow(),
           ],
         ),
       ),
@@ -261,6 +259,32 @@ class _ExecutiveDashboardPageState extends State<ExecutiveDashboardPage> {
                       ),
                     ),
                 ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            PopupMenuButton<String>(
+              offset: const Offset(0, 50),
+              tooltip: 'خيارات المستخدم',
+              onSelected: (value) {
+                if (value == 'logout') {
+                  _handleLogout();
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'logout',
+                  child: Row(
+                    children: [
+                      Icon(Icons.logout, color: Colors.redAccent),
+                      const SizedBox(width: 8),
+                      Text('تسجيل الخروج'),
+                    ],
+                  ),
+                ),
+              ],
+              child: Container(
+                decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: goldAccent.withValues(alpha: 0.5), width: 2)),
+                child: const CircleAvatar(radius: 20, backgroundColor: Color(0xFF112240), child: Icon(Icons.person, color: Colors.white70, size: 20)),
               ),
             ),
           ],

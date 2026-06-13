@@ -177,11 +177,38 @@ class _LoginPageState extends State<LoginPage> {
           password: password,
         );
       } on FirebaseAuthException catch (e) {
-        if (e.code == 'user-not-found' || e.code == 'invalid-credential' || e.code == 'wrong-password' || e.code == 'unknown-error' || e.code == 'internal-error') {
-          setState(() => errorMessage = 'الإيميل أو كلمة المرور غير صحيحة، يرجى مراجعة مسؤول النظام');
+        if (e.code == 'user-not-found' || e.code == 'invalid-credential' || e.code.contains('unknown') || e.code.contains('internal') || e.code == 'INVALID_LOGIN_CREDENTIALS') {
+          // محاولة التسجيل لأول مرة إذا كان في القائمة البيضاء
+          final snapshot = await FirebaseFirestore.instance
+              .collection('allowed_users')
+              .where('emails', arrayContains: email)
+              .limit(1)
+              .get();
+
+          if (snapshot.docs.isNotEmpty) {
+            final allowedUserDoc = snapshot.docs.first;
+            final data = allowedUserDoc.data();
+
+            if (data['is_registered'] == false || data['is_registered'] == null) {
+              // إنشاء الحساب لأول مرة في Firebase Auth
+              credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+                email: email,
+                password: password,
+              );
+            } else {
+              setState(() => errorMessage = 'الحساب مسجل مسبقاً، كلمة المرور غير صحيحة');
+              return;
+            }
+          } else {
+            setState(() => errorMessage = 'الإيميل غير مسجل في النظام، ولا تملك صلاحية الدخول');
+            return;
+          }
+        } else if (e.code == 'wrong-password') {
+          setState(() => errorMessage = 'كلمة المرور غير صحيحة');
           return;
         } else {
-          rethrow;
+          setState(() => errorMessage = 'الإيميل أو كلمة المرور غير صحيحة، يرجى مراجعة مسؤول النظام (${e.code})');
+          return;
         }
       }
 

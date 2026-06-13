@@ -10,6 +10,7 @@ import 'archive_service.dart';
 import 'docx_generator_service.dart';
 import 'routing_service.dart';
 import 'communication_actions_service.dart';
+import 'notification_service.dart';
 
 class CommunicationService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -44,7 +45,7 @@ class CommunicationService {
     final userData = userDoc.data() ?? {};
     final myTitle = userData['administrative_title'] ?? 'staff';
     
-    final deanRoles = ['dean', 'deputy_dean', 'center_director', 'admin_director'];
+    final deanRoles = ['dean', 'deputy_dean', 'center_director', 'admin_director', 'university_president', 'university_vp', 'general_secretary'];
     if (!deanRoles.contains(myTitle)) {
       throw 'ليس لديك الصلاحية لطلب صياغة خطاب. هذه الخاصية متاحة للمدراء فقط.';
     }
@@ -91,6 +92,15 @@ class CommunicationService {
         }
       ]
     });
+
+    // ✅ إرسال تنبيه للسكرتير بطلب مسودة
+    await NotificationService().sendNotification(
+      targetUserId: secId,
+      title: 'طلب صياغة خطاب',
+      body: 'طلب منك $myName صياغة خطاب بموضوع: $subject',
+      type: 'draft_request',
+      relatedDocId: docRef.id,
+    );
   }
 
   Future<void> addWallReminder(String commId, String commTitle, String noteText) async {
@@ -111,11 +121,12 @@ class CommunicationService {
     final user = _auth.currentUser;
     if (user == null) return const Stream.empty();
 
+    // إزالة orderBy لتجنب الحاجة إلى إنشاء Composite Index في فايربيس
+    // سيتم الترتيب لاحقاً في الواجهة إذا لزم الأمر، أو الاعتماد على جلب الوثائق بدون ترتيب
     return _firestore
         .collection('user_reminders')
         .where('user_id', isEqualTo: user.uid)
         .where('is_done', isEqualTo: false)
-        .orderBy('created_at', descending: true)
         .snapshots();
   }
 
@@ -160,12 +171,23 @@ class CommunicationService {
     final userDoc = await _firestore.collection('users').doc(uid).get();
     final userData = userDoc.data() ?? {};
 
-    final dbPin = userData['pin'];
+    final dbPin = userData['pin'] ?? userData['pin_code'];
     final enteredHashed = sha256.convert(utf8.encode(enteredPin)).toString();
 
     if (dbPin != null && dbPin.toString().trim().isNotEmpty) {
       final dbPinStr = dbPin.toString().trim();
-      if (enteredHashed != dbPinStr) {
+      bool isMatch = false;
+      if (dbPinStr.length == 64) {
+        isMatch = (enteredHashed == dbPinStr);
+      } else {
+        isMatch = (enteredPin == dbPinStr);
+        if (isMatch) {
+          // Upgrade to hashed PIN
+          await userDoc.reference.update({'pin': enteredHashed});
+        }
+      }
+      
+      if (!isMatch) {
         throw 'الرمز السري (PIN) غير صحيح';
       }
     } else {
@@ -408,6 +430,16 @@ class CommunicationService {
     });
 
     await batch.commit();
+
+    if (!isCircular && actualRcvId.isNotEmpty && actualRcvId != 'external_entity') {
+      await NotificationService().sendNotification(
+        targetUserId: actualRcvId,
+        title: 'رسالة واردة جديدة',
+        body: 'وصلتك رسالة جديدة من $effectiveSenderName بعنوان: $subject',
+        type: (securityLevel == 'top_secret' || selectedPriority == 'highly_confidential') ? 'urgent' : 'new_message',
+        relatedDocId: commRef.id,
+      );
+    }
   }
 
   Future<String> _getCurrentUserName() async {
@@ -546,6 +578,17 @@ class CommunicationService {
         'comment': isCircular ? 'تم اعتماد ونشر التعميم' : 'تم اعتماد المخاطبة من قبل المدير وإرسالها للجهة المعنية',
         'timestamp': FieldValue.serverTimestamp(),
       });
+
+      // ✅ إرسال تنبيه بتم الاعتماد للمرسل الأصلي للمسودة
+      if (data['sender_id'] != null && data['sender_id'] != user.uid) {
+        await NotificationService().sendNotification(
+          targetUserId: data['sender_id'],
+          title: 'تم الاعتماد',
+          body: 'تم اعتماد وإرسال المسودة التي قمت بصياغتها (موضوع: ${data['subject']})',
+          type: 'approved',
+          relatedDocId: commId,
+        );
+      }
       return;
     }
 
@@ -576,6 +619,17 @@ class CommunicationService {
       'comment': actionComment,
       'timestamp': FieldValue.serverTimestamp(),
     });
+
+    // ✅ إرسال تنبيه بتم الاعتماد للمرسل الأصلي للمسودة
+    if (data['sender_id'] != null && data['sender_id'] != user.uid) {
+      await NotificationService().sendNotification(
+        targetUserId: data['sender_id'],
+        title: 'تم الاعتماد',
+        body: 'تم اعتماد وأرشفة المسودة التي قمت بصياغتها (موضوع: ${data['subject']})',
+        type: 'approved',
+        relatedDocId: commId,
+      );
+    }
   }
 
   Future<void> updateCommunication({

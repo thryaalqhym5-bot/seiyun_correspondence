@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'routing_service.dart';
+import 'notification_service.dart';
 
 /// =====================================================
 /// CommunicationActionsService — إجراءات المراسلات
@@ -85,6 +86,32 @@ class CommunicationActionsService {
       'comment': comment,
       'timestamp': FieldValue.serverTimestamp(),
     });
+  }
+
+  /// إرسال تنبيه للسكرتير عند اتخاذ إجراء على المراسلات الخارجية
+  Future<void> _notifySecretaryOfExternalAction(String managerId, String managerName, String commId, String securityLevel, String actionName) async {
+    if (securityLevel == 'top_secret') return; // لا يتم تنبيه السكرتير إذا كانت سرية جداً
+
+    try {
+      final secQuery = await _firestore.collection('users')
+          .where('manager_id', isEqualTo: managerId)
+          .where('administrative_title', whereIn: ['secretary', 'executive_secretary'])
+          .limit(1)
+          .get();
+
+      if (secQuery.docs.isNotEmpty) {
+        final secId = secQuery.docs.first.id;
+        await NotificationService().sendNotification(
+          targetUserId: secId,
+          title: 'إجراء على مراسلة خارجية',
+          body: 'قام $managerName بـ $actionName على مراسلة خارجية',
+          type: 'info',
+          relatedDocId: commId,
+        );
+      }
+    } catch (e) {
+      debugPrint('Error notifying secretary: $e');
+    }
   }
 
   // =====================================================
@@ -189,6 +216,15 @@ class CommunicationActionsService {
       toStatus: 'forwarded',
       comment: comment.isNotEmpty ? comment : 'تمت إحالة المراسلة',
     );
+
+    // ✅ إرسال تنبيه للمستلم الجديد
+    await NotificationService().sendNotification(
+      targetUserId: routingResult.actualRecipientId,
+      title: 'مراسلة محالة',
+      body: 'تمت إحالة مراسلة إليك من $userName',
+      type: 'new_message',
+      relatedDocId: commId,
+    );
   }
 
   // =====================================================
@@ -234,6 +270,18 @@ class CommunicationActionsService {
       toStatus: 'forwarded',
       comment: comment.isNotEmpty ? comment : 'تمت إحالة المراسلة الخارجية',
     );
+
+    // ✅ إرسال تنبيه للمستلم
+    await NotificationService().sendNotification(
+      targetUserId: targetUserId,
+      title: 'مراسلة خارجية',
+      body: 'تم تحويل مراسلة خارجية إليك من $userName',
+      type: 'urgent',
+      relatedDocId: commId,
+    );
+
+    final securityLevel = (doc.data()?['security_level'] ?? 'normal').toString();
+    await _notifySecretaryOfExternalAction(user.uid, userName, commId, securityLevel, 'إحالة');
   }
 
   // =====================================================
@@ -268,12 +316,15 @@ class CommunicationActionsService {
       action: 'circulate_external',
       fromId: user.uid,
       fromName: userName,
-      toId: 'all',
-      toName: 'المجموعة المستهدفة: $targetGroup',
+      toId: 'group_$targetGroup',
+      toName: targetGroup,
       fromStatus: oldStatus,
       toStatus: 'published',
       comment: comment.isNotEmpty ? comment : 'تم تعميم المراسلة الخارجية',
     );
+
+    final securityLevel = (doc.data()?['security_level'] ?? 'normal').toString();
+    await _notifySecretaryOfExternalAction(user.uid, userName, commId, securityLevel, 'تعميم');
   }
 
   // =====================================================
@@ -314,6 +365,15 @@ class CommunicationActionsService {
       toStatus: 'replied',
       comment: replyText,
     );
+
+    // ✅ إرسال تنبيه بالرد
+    await NotificationService().sendNotification(
+      targetUserId: senderId,
+      title: 'رد على مراسلة',
+      body: 'قام $userName بالرد على مراسلتك',
+      type: 'new_message',
+      relatedDocId: commId,
+    );
   }
 
   // =====================================================
@@ -353,6 +413,15 @@ class CommunicationActionsService {
       fromStatus: oldStatus,
       toStatus: 'rejected',
       comment: 'تم رفض المراسلة: $reason',
+    );
+
+    // ✅ إرسال تنبيه بالرفض
+    await NotificationService().sendNotification(
+      targetUserId: senderId,
+      title: 'مراسلة مرفوضة',
+      body: 'تم رفض مراسلتك من قبل $userName بسبب: $reason',
+      type: 'returned_draft',
+      relatedDocId: commId,
     );
   }
 
@@ -431,6 +500,15 @@ class CommunicationActionsService {
       toStatus: 'returned_for_edit',
       comment: 'تمت إعادة المسودة للتعديل: $managerNotes',
     );
+
+    // ✅ إرسال تنبيه بالمسودة المعادة
+    await NotificationService().sendNotification(
+      targetUserId: originalSenderId,
+      title: 'إعادة مسودة للتعديل',
+      body: 'تمت إعادة مسودة إليك للتعديل من $userName',
+      type: 'returned_draft',
+      relatedDocId: commId,
+    );
   }
 
   // =====================================================
@@ -484,6 +562,10 @@ class CommunicationActionsService {
       toStatus: 'external_reviewed',
       comment: 'تمت مراجعة المراسلة الخارجية',
     );
+
+    final doc = await _firestore.collection('communications').doc(commId).get();
+    final securityLevel = (doc.data()?['security_level'] ?? 'normal').toString();
+    await _notifySecretaryOfExternalAction(user.uid, userName, commId, securityLevel, 'مراجعة');
   }
 
   /// العلم باستلام مراسلة خارجية
@@ -511,6 +593,10 @@ class CommunicationActionsService {
       toStatus: 'acknowledged',
       comment: 'تم العلم بالمراسلة الخارجية',
     );
+
+    final doc = await _firestore.collection('communications').doc(commId).get();
+    final securityLevel = (doc.data()?['security_level'] ?? 'normal').toString();
+    await _notifySecretaryOfExternalAction(user.uid, userName, commId, securityLevel, 'العلم بالاستلام');
   }
 
 

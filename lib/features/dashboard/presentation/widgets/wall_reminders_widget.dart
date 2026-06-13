@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../../../core/models/communication_model.dart';
 import '../../../../core/services/communication_service.dart';
-import '../../../communications/presentation/pages/pdf_view_page.dart';
-import '../../../communications/presentation/pages/official_letter_view_page.dart';
+import '../../../communications/presentation/widgets/message_detail_widget.dart';
 
 class WallRemindersWidget extends StatelessWidget {
   const WallRemindersWidget({super.key});
@@ -22,7 +23,17 @@ class WallRemindersWidget extends StatelessWidget {
           return const SizedBox.shrink(); // Hide if no reminders
         }
 
-        final reminders = snapshot.data!.docs;
+        final reminders = snapshot.data!.docs.toList();
+        reminders.sort((a, b) {
+          final aData = a.data() as Map<String, dynamic>;
+          final bData = b.data() as Map<String, dynamic>;
+          final aTime = aData['created_at'] as Timestamp?;
+          final bTime = bData['created_at'] as Timestamp?;
+          if (aTime == null && bTime == null) return 0;
+          if (aTime == null) return 1;
+          if (bTime == null) return -1;
+          return bTime.compareTo(aTime); // تنازلياً (الأحدث أولاً)
+        });
 
         return Container(
           margin: const EdgeInsets.only(bottom: 24),
@@ -133,22 +144,32 @@ class _ReminderCardState extends State<_ReminderCard> {
       }
       
       final data = doc.data()!;
-      final generatedUrl = data['generated_docx_url']?.toString() ?? '';
-      final attachments = data['attachments'] as List<dynamic>?;
-      
       if (mounted) {
-        if (generatedUrl.isNotEmpty && generatedUrl.endsWith('.pdf')) {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => PdfViewPage(
-            pdfUrl: generatedUrl,
-            title: data['subject'] ?? 'خطاب',
-            communicationId: widget.commId,
-            attachments: attachments,
-          )));
-        } else {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => OfficialLetterViewPage(
-            communicationId: widget.commId,
-          )));
-        }
+        final commModel = CommunicationModel.fromJson(data, widget.commId);
+        
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => Scaffold(
+              backgroundColor: const Color(0xFF0A192F),
+              appBar: AppBar(
+                title: const Text('تفاصيل المخاطبة'),
+                backgroundColor: const Color(0xFF112240),
+                centerTitle: true,
+              ),
+              body: MessageDetailWidget(
+                message: commModel,
+                emptyIcon: Icons.description,
+                emptyText: 'لا توجد تفاصيل متاحة',
+                accentColor: Colors.blueAccent,
+                isOutgoing: data['sender_id'] == FirebaseAuth.instance.currentUser?.uid,
+                onReply: () {
+                  FirebaseFirestore.instance.collection('user_reminders').doc(widget.reminderId).delete();
+                },
+              ),
+            ),
+          ),
+        );
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $e')));

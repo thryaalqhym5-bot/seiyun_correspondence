@@ -159,7 +159,18 @@ class _SecretaryExternalArchivePageState extends State<SecretaryExternalArchiveP
       await _archiveService.ensureDefaultFoldersExist(entityId: entityId, entityType: entityType);
       final receiverFolderId = await _archiveService.getExternalIncomingFolderId(entityId);
 
-      // 3. حفظ المخاطبة في قاعدة البيانات بحالة "بانتظار مراجعة العميد"
+      if (receiverFolderId == null) {
+        throw 'لم يتم العثور على ملف الوارد الخارجي للمستقبل.';
+      }
+
+      // توليد رقم وارد داخلي آلياً للمستقبل
+      final internalRefNumber = await _archiveService.generateReferenceNumber(
+        folderId: receiverFolderId,
+        entityCode: 'و خ', // وارد خارجي
+      );
+
+      // 3. حفظ المخاطبة في قاعدة البيانات بحالة "مؤرشفة" لتصل للعميد جاهزة
+
       final commRef = FirebaseFirestore.instance.collection('communications').doc();
       final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
       await commRef.set({
@@ -168,7 +179,8 @@ class _SecretaryExternalArchivePageState extends State<SecretaryExternalArchiveP
         'type': 'incoming', // وارد خارجي
         'is_external': true,
         'subject': _subjectController.text.trim(),
-        'reference_number': _refController.text.trim(),
+        'reference_number': internalRefNumber,
+        'external_reference_number': _refController.text.trim(),
         'sender_name': _senderNameController.text.trim(),
         'document_date': _dateController.text.trim(), // حفظ تاريخ الخطاب المستخلص
         'target_id': _selectedTargetId,
@@ -177,7 +189,7 @@ class _SecretaryExternalArchivePageState extends State<SecretaryExternalArchiveP
         'current_dept_id': _selectedTargetDeptId,
         'receiver_archive_folder_id': receiverFolderId,
         'generated_docx_url': fileUrl,
-        'status': 'external_pending', // بانتظار مراجعة العميد
+        'status': 'archived', // مؤرشفة مسبقاً من السكرتير
         'is_read_by_dean': false,
         'archived_at': FieldValue.serverTimestamp(),
         'created_at': FieldValue.serverTimestamp(),
@@ -187,11 +199,12 @@ class _SecretaryExternalArchivePageState extends State<SecretaryExternalArchiveP
       // حفظ في التتبع
       await commRef.collection('tracking').add({
         'action': 'external_archive',
+        'from_id': uid, // مطلوب في صلاحيات قواعد البيانات
         'from_name': 'النظام (أرشفة السكرتارية)',
         'to_name': _selectedTargetName,
-        'to_status': 'external_pending',
+        'to_status': 'archived',
         'timestamp': FieldValue.serverTimestamp(),
-        'comment': 'تمت أرشفة معاملة خارجية وتوجيهها للمسؤول للمراجعة',
+        'comment': 'تمت أرشفة معاملة خارجية وتقييدها بالرقم ($internalRefNumber) وتوجيهها للمسؤول',
       });
 
       if (mounted) {

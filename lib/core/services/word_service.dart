@@ -9,7 +9,7 @@ import '../utils/pdf_security_utils.dart';
 import '../../features/communications/presentation/pages/pdf_view_page.dart';
 
 class WordService {
-  static Future<void> openCommunicationPdf(BuildContext context, Map<String, dynamic> data, String communicationId, String subject) async {
+  static Future<void> openCommunicationPdf(BuildContext context, Map<String, dynamic> data, String communicationId, String subject, {bool applyWatermark = true}) async {
     try {
       String localPath = (data['final_pdf_path'] ?? '').toString();
 
@@ -25,21 +25,24 @@ class WordService {
         final emailPrefix = (currentUser?.email ?? 'User').split('@')[0];
         final finalOpenerName = userName.isNotEmpty ? '$userName ($emailPrefix)' : emailPrefix;
 
-        final securedPdf = await PdfSecurityUtils.applySecurityFeatures(
-          originalPdf: File(localPath),
-          userName: finalOpenerName,
-          documentId: communicationId,
-          digitalSignature: data['digital_signature']?.toString(),
-          senderSignatureUrl: data['sender_signature_url']?.toString(),
-          senderSealUrl: data['sender_seal_url']?.toString(),
-        );
+        File displayPdf = File(localPath);
+        if (applyWatermark) {
+          displayPdf = await PdfSecurityUtils.applySecurityFeatures(
+            originalPdf: displayPdf,
+            userName: finalOpenerName,
+            documentId: communicationId,
+            digitalSignature: data['digital_signature']?.toString(),
+            senderSignatureUrl: data['sender_signature_url']?.toString(),
+            senderSealUrl: data['sender_seal_url']?.toString(),
+          );
+        }
 
         if (context.mounted) {
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (_) => PdfViewPage(
-                localFilePath: securedPdf.path,
+                localFilePath: displayPdf.path,
                 title: subject,
                 communicationId: communicationId,
                 attachments: data['attachments'] as List<dynamic>?,
@@ -81,14 +84,17 @@ class WordService {
       // دمج الاسم العربي مع المعرف الإنجليزي لضمان ظهوره إذا لم يدعم الخط العربي
       final finalOpenerName = userName.isNotEmpty ? '$userName ($emailPrefix)' : emailPrefix;
 
-      final securedPdf = await PdfSecurityUtils.applySecurityFeatures(
-        originalPdf: pdfFile,
-        userName: finalOpenerName,
-        documentId: communicationId,
-        digitalSignature: data['digital_signature']?.toString(),
-        senderSignatureUrl: data['sender_signature_url']?.toString(),
-        senderSealUrl: data['sender_seal_url']?.toString(),
-      );
+      File displayPdf = pdfFile;
+      if (applyWatermark) {
+        displayPdf = await PdfSecurityUtils.applySecurityFeatures(
+          originalPdf: pdfFile,
+          userName: finalOpenerName,
+          documentId: communicationId,
+          digitalSignature: data['digital_signature']?.toString(),
+          senderSignatureUrl: data['sender_signature_url']?.toString(),
+          senderSealUrl: data['sender_seal_url']?.toString(),
+        );
+      }
       // ------------------------------------------------
 
       if (context.mounted) {
@@ -96,7 +102,7 @@ class WordService {
           context,
           MaterialPageRoute(
             builder: (_) => PdfViewPage(
-              localFilePath: securedPdf.path,
+              localFilePath: displayPdf.path,
               title: subject,
               communicationId: communicationId,
               attachments: data['attachments'] as List<dynamic>?,
@@ -106,6 +112,67 @@ class WordService {
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $e')));
+    }
+  }
+
+  static Future<void> downloadCommunicationPdfToDisk(BuildContext context, Map<String, dynamic> data, String communicationId, String subject) async {
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('جاري تجهيز وتنزيل المستند (بدون علامة مائية)...')));
+
+      String localPath = (data['final_pdf_path'] ?? '').toString();
+      File? sourcePdf;
+
+      if (localPath.isNotEmpty && File(localPath).existsSync()) {
+        sourcePdf = File(localPath);
+      } else {
+        final docxUrl = data['generated_docx_url'] as String?;
+        if (docxUrl == null || docxUrl.isEmpty) {
+          throw 'لا يوجد ملف مرفق مع هذه المخاطبة.';
+        }
+
+        final ref = FirebaseStorage.instance.refFromURL(docxUrl);
+        final bytes = await ref.getData(15 * 1024 * 1024);
+        if (bytes == null) throw 'فشل تحميل المستند من الخادم';
+
+        final dir = await getApplicationDocumentsDirectory();
+        final docxFile = File('${dir.path}/downloaded_$communicationId.docx');
+        await docxFile.writeAsBytes(bytes);
+
+        sourcePdf = await convertDocxToPdf(docxFile);
+      }
+
+      final securedPdf = await PdfSecurityUtils.applySecurityFeatures(
+        originalPdf: sourcePdf,
+        userName: '',
+        documentId: communicationId,
+        digitalSignature: data['digital_signature']?.toString(),
+        senderSignatureUrl: data['sender_signature_url']?.toString(),
+        senderSealUrl: data['sender_seal_url']?.toString(),
+        skipWatermark: true, // تخطي العلامة المائية للتصدير الخارجي
+      );
+
+      final downloadsDir = await getDownloadsDirectory();
+      if (downloadsDir == null) {
+        throw 'لم يتم العثور على مجلد التنزيلات في جهازك.';
+      }
+
+      final safeSubject = subject.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
+      final exportPath = '${downloadsDir.path}\\$safeSubject - صادر خارجي.pdf';
+      final exportFile = File(exportPath);
+      
+      await exportFile.writeAsBytes(await securedPdf.readAsBytes());
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('تم تنزيل المستند بنجاح في مجلد التنزيلات:\n$exportPath'),
+          duration: const Duration(seconds: 5),
+          backgroundColor: Colors.green,
+        ));
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ في التنزيل: $e'), backgroundColor: Colors.red));
+      }
     }
   }
 

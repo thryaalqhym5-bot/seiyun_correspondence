@@ -28,6 +28,7 @@ class CommunicationModel {
   final bool isExternal;
   final String? documentDate;
   final String? referenceNumber;
+  final String? externalReferenceNumber;
   final bool isReadByDean;
   final bool isRead;
 
@@ -70,6 +71,7 @@ class CommunicationModel {
     this.isExternal = false,
     this.documentDate,
     this.referenceNumber,
+    this.externalReferenceNumber,
     this.isReadByDean = false,
     this.isRead = false,
     this.parentCommId,
@@ -109,6 +111,7 @@ class CommunicationModel {
       isExternal: json['is_external'] as bool? ?? false,
       documentDate: json['document_date'] as String?,
       referenceNumber: json['reference_number'] as String?,
+      externalReferenceNumber: json['external_reference_number'] as String?,
       isReadByDean: json['is_read_by_dean'] as bool? ?? false,
       isRead: json['is_read'] as bool? ?? false,
       parentCommId: json['parent_comm_id'] as String?,
@@ -148,6 +151,7 @@ class CommunicationModel {
       'is_external': isExternal,
       if (documentDate != null) 'document_date': documentDate,
       if (referenceNumber != null) 'reference_number': referenceNumber,
+      if (externalReferenceNumber != null) 'external_reference_number': externalReferenceNumber,
       'is_read_by_dean': isReadByDean,
       'is_read': isRead,
       if (parentCommId != null) 'parent_comm_id': parentCommId,

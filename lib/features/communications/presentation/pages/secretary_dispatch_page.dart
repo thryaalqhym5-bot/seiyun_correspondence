@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/models/communication_model.dart';
+import '../../../../core/services/word_service.dart';
 import '../viewmodels/communications_viewmodel.dart';
 import '../widgets/message_list_widget.dart';
 import '../widgets/message_detail_widget.dart';
@@ -121,8 +122,26 @@ class _SecretaryDispatchPageState extends State<SecretaryDispatchPage> {
                         emptyIcon: Icons.outbox,
                         emptyText: 'اختر رسالة لعرض محتواها وتصديرها',
                         accentColor: Colors.blueAccent,
+                        isOutgoing: true, // مهم جداً: هذا صادر خارجي
                         customActions: [
-                          if (_viewModel.selectedMessage != null)
+                          if (_viewModel.selectedMessage != null) ...[
+                            ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.teal,
+                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                              ),
+                              onPressed: () {
+                                WordService.downloadCommunicationPdfToDisk(
+                                  context,
+                                  _viewModel.selectedMessage!.toJson(),
+                                  _viewModel.selectedMessage!.id ?? '',
+                                  _viewModel.selectedMessage!.subject,
+                                );
+                              },
+                              icon: const Icon(Icons.file_download),
+                              label: const Text('تنزيل للتصدير (بدون علامة مائية)'),
+                            ),
+                            const SizedBox(width: 16),
                             ElevatedButton.icon(
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.green,
@@ -130,8 +149,9 @@ class _SecretaryDispatchPageState extends State<SecretaryDispatchPage> {
                               ),
                               onPressed: () => _markAsDispatched(_viewModel.selectedMessage!.id!),
                               icon: const Icon(Icons.check_circle_outline),
-                              label: const Text('تم التصدير (أرشفة)'),
+                              label: const Text('تأكيد التصدير (أرشفة)'),
                             ),
+                          ],
                         ],
                       );
                     },

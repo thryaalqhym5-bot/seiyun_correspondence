@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -39,19 +40,35 @@ class _FolderCommunicationsPageState extends State<FolderCommunicationsPage> {
         .where('receiver_archive_folder_id', isEqualTo: widget.folderId)
         .snapshots();
 
-    // دمج النتيجتين في Stream واحد مع إزالة التكرار
-    return senderStream.asyncExpand((senderSnap) {
-      return receiverStream.map((receiverSnap) {
-        final Map<String, QueryDocumentSnapshot> uniqueDocs = {};
-        for (final doc in senderSnap.docs) {
-          uniqueDocs[doc.id] = doc;
-        }
-        for (final doc in receiverSnap.docs) {
-          uniqueDocs[doc.id] = doc;
-        }
-        return uniqueDocs.values.toList();
-      });
+    // نستخدم rxdart أو Filter.or، لكن لتجنب مشاكل الفهرسة، سندمج البثين يدوياً
+    final controller = StreamController<List<QueryDocumentSnapshot>>();
+    
+    List<QueryDocumentSnapshot> senderDocs = [];
+    List<QueryDocumentSnapshot> receiverDocs = [];
+
+    void emitCombined() {
+      final Map<String, QueryDocumentSnapshot> uniqueDocs = {};
+      for (final doc in senderDocs) uniqueDocs[doc.id] = doc;
+      for (final doc in receiverDocs) uniqueDocs[doc.id] = doc;
+      controller.add(uniqueDocs.values.toList());
+    }
+
+    final sub1 = senderStream.listen((snap) {
+      senderDocs = snap.docs;
+      emitCombined();
     });
+
+    final sub2 = receiverStream.listen((snap) {
+      receiverDocs = snap.docs;
+      emitCombined();
+    });
+
+    controller.onCancel = () {
+      sub1.cancel();
+      sub2.cancel();
+    };
+
+    return controller.stream;
   }
 
   @override
@@ -419,7 +436,9 @@ class _MessagePreviewPanel extends StatelessWidget {
     final target = data['target_name'] ?? 'مجهول';
     final body = data['body'] ?? data['content'] ?? '';
     final rawRef = data['reference_number'] ?? '';
-    final hasRef = rawRef.toString().trim().isNotEmpty;
+    final extRef = data['external_reference_number'] ?? '';
+    final hasRef = rawRef.toString().isNotEmpty;
+    final hasExtRef = extRef.toString().isNotEmpty;
     final isExternal = data['is_external'] == true;
     final fileUrl = data['generated_docx_url'] ?? '';
     final commId = data['comm_id'] ?? '';
@@ -498,7 +517,11 @@ class _MessagePreviewPanel extends StatelessWidget {
                   Text(dateString, style: const TextStyle(color: Colors.white54, fontSize: 13)),
                   const SizedBox(height: 4),
                   if (hasRef)
-                    Text('المرجع: $rawRef', style: const TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.bold)),
+                    Text('رقم القيد: $rawRef', style: const TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.bold)),
+                  if (hasExtRef) ...[
+                    const SizedBox(height: 2),
+                    Text('المرجع الخارجي: $extRef', style: const TextStyle(color: Colors.orangeAccent, fontSize: 12, fontWeight: FontWeight.bold)),
+                  ],
                 ],
               ),
             ],

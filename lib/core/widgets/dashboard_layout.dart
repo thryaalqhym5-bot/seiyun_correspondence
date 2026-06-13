@@ -130,12 +130,16 @@ class _DashboardLayoutState extends State<DashboardLayout> {
                                   size: 20,
                                 ),
                                 const SizedBox(width: 12),
-                                Text(
-                                  item.title,
-                                  style: TextStyle(
-                                    color: isSelected ? AppColors.primary : AppColors.textSecondary,
-                                    fontSize: 15,
-                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                Expanded(
+                                  child: Text(
+                                    item.title,
+                                    style: TextStyle(
+                                      color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                                      fontSize: 15,
+                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                               ],

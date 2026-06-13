@@ -171,6 +171,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         return const TemplatesPage();
       case 4:
         return const AdminArchiveManagementPage();
+      case 5:
+        return const AdminUploadPage();
       default:
         return _buildDashboardContent();
     }
@@ -190,6 +192,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         SidebarItem(title: 'الكليات والأقسام', icon: Icons.account_balance_outlined),
         SidebarItem(title: 'إدارة القوالب', icon: Icons.description_outlined),
         SidebarItem(title: 'الأرشيف والصلاحيات', icon: Icons.archive_outlined),
+        SidebarItem(title: 'رفع بيانات الجامعة', icon: Icons.upload_file),
       ],
       child: _buildBody(),
     );
@@ -202,13 +205,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'نظرة عامة',
-              style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 32),
-            _buildStatsRow(),
-            const SizedBox(height: 32),
+
             Expanded(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -227,14 +224,17 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                           child: LayoutBuilder(
                             builder: (context, constraints) {
                               int crossAxisCount = 2;
-                              if (constraints.maxWidth > 1200) crossAxisCount = 3;
-                              if (constraints.maxWidth > 1600) crossAxisCount = 4;
+                              if (constraints.maxWidth > 700) crossAxisCount = 3;
+                              if (constraints.maxWidth > 1100) crossAxisCount = 4;
+                              if (constraints.maxWidth > 1500) crossAxisCount = 5;
                               
-                              return GridView.count(
-                                crossAxisCount: crossAxisCount,
-                                crossAxisSpacing: 16,
-                                mainAxisSpacing: 16,
-                                childAspectRatio: 2.5, // Make cards more compact as requested
+                              return GridView(
+                                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: crossAxisCount,
+                                  crossAxisSpacing: 12,
+                                  mainAxisSpacing: 12,
+                                  mainAxisExtent: 95,
+                                ),
                                 children: [
                                   _ActionCard(
                                     title: 'رفع بيانات الجامعة',
@@ -436,18 +436,18 @@ class _ActionCardState extends State<_ActionCard> {
             onTap: widget.onTap,
             borderRadius: BorderRadius.circular(20),
             child: Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(8.0),
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: widget.color.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(widget.icon, color: widget.color, size: 28),
+                    child: Icon(widget.icon, color: widget.color, size: 20),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -455,12 +455,16 @@ class _ActionCardState extends State<_ActionCard> {
                       children: [
                         Text(
                           widget.title,
-                          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                          style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 2),
                         Text(
                           widget.subtitle,
-                          style: const TextStyle(color: Colors.white54, fontSize: 13),
+                          style: const TextStyle(color: Colors.white54, fontSize: 11),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),

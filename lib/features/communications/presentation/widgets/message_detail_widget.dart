@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/models/communication_model.dart';
 import '../../../../core/services/word_service.dart';
+import '../../../../core/services/communication_service.dart';
 import '../pages/create_communication_page.dart';
 
 class MessageDetailWidget extends StatelessWidget {
@@ -15,6 +16,7 @@ class MessageDetailWidget extends StatelessWidget {
   final String? currentUserTitle;
   final bool isOutgoing;
   final List<Widget>? customActions;
+  final VoidCallback? onReply;
 
   const MessageDetailWidget({
     super.key,
@@ -25,6 +27,7 @@ class MessageDetailWidget extends StatelessWidget {
     this.currentUserTitle,
     this.isOutgoing = false,
     this.customActions,
+    this.onReply,
   });
 
   Widget _buildBadge(String text, Color color) {
@@ -94,20 +97,31 @@ class MessageDetailWidget extends StatelessWidget {
                           ),
                         _buildBadge(message!.status, AppColors.success),
                         const SizedBox(width: 8),
-                        // زر الرد: للمراسلات الخارجية يظهر فقط للعميد، وللمراسلات الداخلية يظهر إذا لم يكن صادراً
-                        if (!effectiveIsOutgoing && (!isExternal || currentUserTitle == 'dean'))
+                        // زر الرد يظهر للمراسلات الواردة، أو إذا كان هناك إجراء مخصص (مثل حائط التذكيرات)
+                        if (!effectiveIsOutgoing || onReply != null)
                           IconButton(
                             icon: const Icon(Icons.reply, color: Colors.tealAccent),
                             onPressed: () {
+                              if (onReply != null) {
+                                onReply!();
+                              }
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) => CreateCommunicationPage(replyTo: message),
+                                  builder: (_) => CreateCommunicationPage(
+                                    replyTo: message,
+                                    isExternalReply: isExternal,
+                                  ),
                                 ),
                               );
                             },
                             tooltip: 'رد على المخاطبة',
                           ),
+                        IconButton(
+                          icon: const Icon(Icons.push_pin_outlined, color: Colors.orangeAccent),
+                          onPressed: () => _showAddWallReminderDialog(context),
+                          tooltip: 'تعليق في حائط التذكيرات',
+                        ),
                         IconButton(
                           icon: const Icon(Icons.print_outlined, color: Colors.white70),
                           onPressed: () {
@@ -433,15 +447,11 @@ class MessageDetailWidget extends StatelessWidget {
                 icon: const Icon(Icons.visibility),
                 label: const Text('معاينة الوثيقة (PDF)'),
               ),
-              if (!effectiveIsOutgoing)
+              if (!effectiveIsOutgoing || onReply != null) ...[
                 const SizedBox(width: 16),
-              if (!effectiveIsOutgoing)
                 ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.tealAccent.shade700,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  ),
                   onPressed: () {
+                    if (onReply != null) onReply!();
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -450,8 +460,10 @@ class MessageDetailWidget extends StatelessWidget {
                     );
                   },
                   icon: const Icon(Icons.reply),
-                  label: const Text('رد على المخاطبة'),
+                  label: const Text('رد'),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
                 ),
+              ],
               if (customActions != null) ...[
                 if (!effectiveIsOutgoing) const SizedBox(width: 16),
                 ...customActions!,
@@ -465,7 +477,13 @@ class MessageDetailWidget extends StatelessWidget {
 
   /// عرض الوثيقة الخارجية مباشرة (PDF أو صورة) بدون تحويل
   Widget _buildExternalDocumentView() {
-    final fileUrl = message!.generatedDocxUrl;
+    String? fileUrl = message!.generatedDocxUrl;
+    if (fileUrl == null || fileUrl.isEmpty) {
+      if (message!.attachments != null && message!.attachments!.isNotEmpty) {
+        fileUrl = message!.attachments!.first['url'] as String?;
+      }
+    }
+    
     if (fileUrl == null || fileUrl.isEmpty) {
       return const Center(
         child: Text('لا يوجد ملف مرفق لهذه المراسلة',
@@ -525,7 +543,13 @@ class MessageDetailWidget extends StatelessWidget {
 
   /// فتح الوثيقة الخارجية ملء الشاشة
   void _openExternalDocument(BuildContext context) {
-    final fileUrl = message!.generatedDocxUrl;
+    String? fileUrl = message!.generatedDocxUrl;
+    if (fileUrl == null || fileUrl.isEmpty) {
+      if (message!.attachments != null && message!.attachments!.isNotEmpty) {
+        fileUrl = message!.attachments!.first['url'] as String?;
+      }
+    }
+    
     if (fileUrl == null || fileUrl.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('لا يوجد ملف مرفق'), backgroundColor: Colors.red),
@@ -563,6 +587,60 @@ class MessageDetailWidget extends StatelessWidget {
             ],
           ),
           body: _buildExternalDocumentView(),
+        ),
+      ),
+    );
+  }
+
+  void _showAddWallReminderDialog(BuildContext context) {
+    if (message?.id == null) return;
+    final TextEditingController noteController = TextEditingController();
+    bool isSaving = false;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setStateDialog) => AlertDialog(
+          backgroundColor: const Color(0xFF0F1E38),
+          title: const Text('إضافة تذكير للحائط', style: TextStyle(color: Colors.white)),
+          content: TextField(
+            controller: noteController,
+            style: const TextStyle(color: Colors.white),
+            maxLines: 3,
+            decoration: InputDecoration(
+              hintText: 'اكتب تذكيرك هنا (مثلاً: متابعة القرار خلال أسبوع)',
+              hintStyle: const TextStyle(color: Colors.white54),
+              enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2))),
+              focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: Colors.orangeAccent)),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('إلغاء', style: TextStyle(color: Colors.white54)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.orangeAccent),
+              onPressed: isSaving ? null : () async {
+                if (noteController.text.trim().isEmpty) return;
+                setStateDialog(() => isSaving = true);
+                try {
+                  final service = CommunicationService();
+                  await service.addWallReminder(message!.id!, message!.subject, noteController.text.trim());
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تمت إضافة التذكير لحائطك بنجاح')));
+                  }
+                } catch (e) {
+                  setStateDialog(() => isSaving = false);
+                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('حدث خطأ: $e')));
+                }
+              },
+              child: isSaving 
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
+                  : const Text('إضافة للتذكيرات', style: TextStyle(color: Colors.black)),
+            ),
+          ],
         ),
       ),
     );

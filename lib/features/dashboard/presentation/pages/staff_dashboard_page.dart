@@ -284,8 +284,7 @@ class _StaffDashboardPageState extends State<StaffDashboardPage> {
             const SizedBox(height: 24),
             const WallRemindersWidget(),
             const SizedBox(height: 24),
-            _buildStatsRow(),
-            const SizedBox(height: 32),
+
             Expanded(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -382,8 +381,7 @@ class _StaffDashboardPageState extends State<StaffDashboardPage> {
             const SizedBox(height: 24),
             const WallRemindersWidget(),
             const SizedBox(height: 24),
-            _buildStatsRow(),
-            const SizedBox(height: 32),
+
             Expanded(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -454,8 +452,7 @@ class _StaffDashboardPageState extends State<StaffDashboardPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildSignatureCard(),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 16),
                         Expanded(child: _buildActivityFeed()),
                       ],
                     ),
@@ -471,145 +468,140 @@ class _StaffDashboardPageState extends State<StaffDashboardPage> {
 
   Widget _buildGenericDashboardContent() {
     return SafeArea(
-      child: Padding(
+      child: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 32.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeader(),
-            const SizedBox(height: 24),
-            const WallRemindersWidget(),
-            const SizedBox(height: 24),
-            _buildStatsRow(),
-            const SizedBox(height: 32),
-            Expanded(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'الإجراءات السريعة',
-                          style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 24),
-                        Expanded(
-                          child: LayoutBuilder(
-                            builder: (context, constraints) {
-                              int crossAxisCount = 1;
-                              if (constraints.maxWidth > 500) crossAxisCount = 2;
-                              if (constraints.maxWidth > 900) crossAxisCount = 3;
-                              if (constraints.maxWidth > 1400) crossAxisCount = 4;
+        children: [
+          _buildHeader(),
+          const SizedBox(height: 24),
+          const WallRemindersWidget(),
+          const SizedBox(height: 32),
+          Wrap(
+            spacing: 40,
+            runSpacing: 40,
+            crossAxisAlignment: WrapCrossAlignment.start,
+            children: [
+              SizedBox(
+                width: 800,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'الإجراءات السريعة',
+                      style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 24),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        int crossAxisCount = 2;
+                        if (constraints.maxWidth > 600) crossAxisCount = 3;
+                        if (constraints.maxWidth > 900) crossAxisCount = 4;
+                        if (constraints.maxWidth > 1400) crossAxisCount = 5;
 
-                              return GridView.count(
-                                crossAxisCount: crossAxisCount,
-                                crossAxisSpacing: 16,
-                                mainAxisSpacing: 16,
-                                childAspectRatio: constraints.maxWidth < 500 ? 3.0 : 1.8,
-                                children: [
-                                  _ActionCard(
-                                    title: 'إنشاء مخاطبة',
-                                    subtitle: 'صياغة وإرسال معاملة جديدة',
-                                    icon: Icons.add_box_outlined,
-                                    color: Colors.blueAccent,
-                                    isPrimary: true,
-                                    onTap: () => setState(() => _selectedIndex = 1),
-                                  ),
-                                  _ActionCard(
-                                    title: 'الوارد',
-                                    subtitle: 'المعاملات المستلمة',
-                                    icon: Icons.move_to_inbox_outlined,
-                                    color: Colors.greenAccent,
-                                    onTap: () => setState(() => _selectedIndex = 2),
-                                  ),
-                                  _ActionCard(
-                                    title: 'الصادر',
-                                    subtitle: 'المعاملات المرسلة',
-                                    icon: Icons.outbox_outlined,
-                                    color: Colors.orangeAccent,
-                                    onTap: () => setState(() => _selectedIndex = 3),
-                                  ),
-                                  if (userTitle != 'staff')
-                                    _ActionCard(
-                                      title: 'الأرشيف',
-                                      subtitle: 'السجلات والوثائق المحفوظة',
-                                      icon: Icons.archive_outlined,
-                                      color: Colors.purpleAccent,
-                                      onTap: () => setState(() => _selectedIndex = _getSidebarItems().indexWhere((i) => i.title == 'الأرشيف')),
-                                    ),
-                                  if (['dean', 'vice_dean', 'vice_dean_student', 'vice_dean_academic', 'vice_dean_postgraduate', 'center_director', 'vice_director', 'general_director', 'head_of_department', 'university_president', 'university_vp', 'general_secretary'].contains(userTitle))
-                                    _ActionCard(
-                                      title: 'مجهزة للاعتماد',
-                                      subtitle: 'مسودات بانتظار موافقتك',
-                                      icon: Icons.checklist_rtl,
-                                      color: Colors.orangeAccent,
-                                      isPrimary: true,
-                                      onTap: () => setState(() => _selectedIndex = _getSidebarItems().indexWhere((i) => i.title == 'مجهزة للاعتماد')),
-                                    ),
-                                  if (['dean', 'vice_dean', 'vice_dean_student', 'vice_dean_academic', 'vice_dean_postgraduate', 'center_director', 'vice_director', 'general_director', 'head_of_department', 'university_president', 'university_vp', 'general_secretary'].contains(userTitle))
-                                    _ExternalInboxCard(
-                                      onTap: () => setState(() => _selectedIndex = _getSidebarItems().indexWhere((i) => i.title == 'وارد خارجي')),
-                                    ),
-                                  if (['dean', 'vice_dean', 'vice_dean_student', 'vice_dean_academic', 'vice_dean_postgraduate', 'center_director', 'vice_director', 'general_director', 'head_of_department', 'university_president', 'university_vp', 'general_secretary'].contains(userTitle))
-                                    _ActionCard(
-                                      title: 'طلب صياغة',
-                                      subtitle: 'توجيه السكرتير بصياغة مسودة',
-                                      icon: Icons.edit_document,
-                                      color: Colors.tealAccent,
-                                      onTap: () => _showDraftRequestDialog(),
-                                    ),
-                                  if (['dean', 'vice_dean', 'vice_dean_student', 'vice_dean_academic', 'vice_dean_postgraduate', 'center_director', 'vice_director', 'general_director', 'head_of_department', 'university_president', 'university_vp', 'general_secretary'].contains(userTitle))
-                                    _ActionCard(
-                                      title: 'تفويض الصلاحيات',
-                                      subtitle: 'إدارة نوابك ومفوضيك',
-                                      icon: Icons.groups,
-                                      color: Colors.blueGrey,
-                                      onTap: () => setState(() => _selectedIndex = _getSidebarItems().indexWhere((i) => i.title == 'إدارة التفويض والصلاحيات')),
-                                    ),
-                                  if (userTitle == 'university_vp_academic')
-                                    _ActionCard(
-                                      title: 'تفعيل الحسابات',
-                                      subtitle: 'إضافة إيميلات الأكاديميين',
-                                      icon: Icons.manage_accounts_outlined,
-                                      color: Colors.pinkAccent,
-                                      onTap: () => setState(() => _selectedIndex = _getSidebarItems().indexWhere((i) => i.title == 'تفعيل إيميلات الأكاديميين')),
-                                    ),
-                                  if (userTitle == 'vice_dean_academic')
-                                    _ActionCard(
-                                      title: 'إدارة أعضاء الكلية',
-                                      subtitle: 'تعديل وحذف الأعضاء',
-                                      icon: Icons.people_alt_outlined,
-                                      color: Colors.lightBlueAccent,
-                                      onTap: () => setState(() => _selectedIndex = _getSidebarItems().indexWhere((i) => i.title == 'إدارة أعضاء الكلية')),
-                                    ),
-                                ],
-                              );
-                            }
+                        return GridView(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: crossAxisCount,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                            mainAxisExtent: 95,
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 40),
-                  Expanded(
-                    flex: 1,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildSignatureCard(),
-                        const SizedBox(height: 24),
-                        Expanded(child: _buildActivityFeed()),
-                      ],
-                    ),
-                  ),
-                ],
+                          children: [
+                              _ActionCard(
+                                title: 'إنشاء مخاطبة',
+                                subtitle: 'صياغة وإرسال معاملة جديدة',
+                                icon: Icons.add_box_outlined,
+                                color: Colors.blueAccent,
+                                isPrimary: true,
+                                onTap: () => setState(() => _selectedIndex = 1),
+                              ),
+                              _ActionCard(
+                                title: 'الوارد',
+                                subtitle: 'المعاملات المستلمة',
+                                icon: Icons.move_to_inbox_outlined,
+                                color: Colors.greenAccent,
+                                onTap: () => setState(() => _selectedIndex = 2),
+                              ),
+                              _ActionCard(
+                                title: 'الصادر',
+                                subtitle: 'المعاملات المرسلة',
+                                icon: Icons.outbox_outlined,
+                                color: Colors.orangeAccent,
+                                onTap: () => setState(() => _selectedIndex = 3),
+                              ),
+                              if (userTitle != 'staff')
+                                _ActionCard(
+                                  title: 'الأرشيف',
+                                  subtitle: 'السجلات والوثائق المحفوظة',
+                                  icon: Icons.archive_outlined,
+                                  color: Colors.purpleAccent,
+                                  onTap: () => setState(() => _selectedIndex = _getSidebarItems().indexWhere((i) => i.title == 'الأرشيف')),
+                                ),
+                              if (['dean', 'vice_dean', 'vice_dean_student', 'vice_dean_academic', 'vice_dean_postgraduate', 'center_director', 'vice_director', 'general_director', 'head_of_department', 'university_president', 'university_vp', 'general_secretary'].contains(userTitle))
+                                _ActionCard(
+                                  title: 'مجهزة للاعتماد',
+                                  subtitle: 'مسودات بانتظار موافقتك',
+                                  icon: Icons.checklist_rtl,
+                                  color: Colors.orangeAccent,
+                                  isPrimary: true,
+                                  onTap: () => setState(() => _selectedIndex = _getSidebarItems().indexWhere((i) => i.title == 'مجهزة للاعتماد')),
+                                ),
+                              if (['dean', 'vice_dean', 'vice_dean_student', 'vice_dean_academic', 'vice_dean_postgraduate', 'center_director', 'vice_director', 'general_director', 'head_of_department', 'university_president', 'university_vp', 'general_secretary'].contains(userTitle))
+                                _ExternalInboxCard(
+                                  onTap: () => setState(() => _selectedIndex = _getSidebarItems().indexWhere((i) => i.title == 'وارد خارجي')),
+                                ),
+                              if (['dean', 'vice_dean', 'vice_dean_student', 'vice_dean_academic', 'vice_dean_postgraduate', 'center_director', 'vice_director', 'general_director', 'head_of_department', 'university_president', 'university_vp', 'general_secretary'].contains(userTitle))
+                                _ActionCard(
+                                  title: 'طلب صياغة',
+                                  subtitle: 'توجيه السكرتير بصياغة مسودة',
+                                  icon: Icons.edit_document,
+                                  color: Colors.tealAccent,
+                                  onTap: () => _showDraftRequestDialog(),
+                                ),
+                              if (['dean', 'vice_dean', 'vice_dean_student', 'vice_dean_academic', 'vice_dean_postgraduate', 'center_director', 'vice_director', 'general_director', 'head_of_department', 'university_president', 'university_vp', 'general_secretary'].contains(userTitle))
+                                _ActionCard(
+                                  title: 'تفويض الصلاحيات',
+                                  subtitle: 'إدارة نوابك ومفوضيك',
+                                  icon: Icons.groups,
+                                  color: Colors.blueGrey,
+                                  onTap: () => setState(() => _selectedIndex = _getSidebarItems().indexWhere((i) => i.title == 'إدارة التفويض والصلاحيات')),
+                                ),
+                              if (userTitle == 'university_vp_academic')
+                                _ActionCard(
+                                  title: 'تفعيل الحسابات',
+                                  subtitle: 'إضافة إيميلات الأكاديميين',
+                                  icon: Icons.manage_accounts_outlined,
+                                  color: Colors.pinkAccent,
+                                  onTap: () => setState(() => _selectedIndex = _getSidebarItems().indexWhere((i) => i.title == 'تفعيل إيميلات الأكاديميين')),
+                                ),
+                              if (userTitle == 'vice_dean_academic')
+                                _ActionCard(
+                                  title: 'إدارة أعضاء الكلية',
+                                  subtitle: 'تعديل وحذف الأعضاء',
+                                  icon: Icons.people_alt_outlined,
+                                  color: Colors.lightBlueAccent,
+                                  onTap: () => setState(() => _selectedIndex = _getSidebarItems().indexWhere((i) => i.title == 'إدارة أعضاء الكلية')),
+                                ),
+                            ],
+                          );
+                        }
+                      ),
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
+              SizedBox(
+                width: 350,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 16),
+                    _buildActivityFeed(),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -803,9 +795,43 @@ class _StaffDashboardPageState extends State<StaffDashboardPage> {
             ),
             _buildNotificationsBell(),
             const SizedBox(width: 16),
-            Container(
-              decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: primaryAccent.withValues(alpha: 0.5), width: 2)),
-              child: const CircleAvatar(radius: 20, backgroundColor: Color(0xFF112240), child: Icon(Icons.person, color: Colors.white70, size: 20)),
+            PopupMenuButton<String>(
+              offset: const Offset(0, 50),
+              tooltip: 'خيارات المستخدم',
+              onSelected: (value) {
+                if (value == 'signature') {
+                  _handleSetupSignature(signatureUrl != null);
+                } else if (value == 'logout') {
+                  _handleLogout();
+                }
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'signature',
+                  child: Row(
+                    children: [
+                      Icon(Icons.draw, color: signatureUrl != null ? Colors.green : Colors.blueAccent),
+                      const SizedBox(width: 8),
+                      Text(signatureUrl != null ? 'تعديل التوقيع' : 'إعداد التوقيع'),
+                    ],
+                  ),
+                ),
+                const PopupMenuDivider(),
+                const PopupMenuItem(
+                  value: 'logout',
+                  child: Row(
+                    children: [
+                      Icon(Icons.logout, color: Colors.redAccent),
+                      const SizedBox(width: 8),
+                      Text('تسجيل الخروج'),
+                    ],
+                  ),
+                ),
+              ],
+              child: Container(
+                decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: primaryAccent.withValues(alpha: 0.5), width: 2)),
+                child: const CircleAvatar(radius: 20, backgroundColor: Color(0xFF112240), child: Icon(Icons.person, color: Colors.white70, size: 20)),
+              ),
             ),
           ],
         ),
@@ -976,12 +1002,13 @@ class _StaffDashboardPageState extends State<StaffDashboardPage> {
             ],
           ),
           const SizedBox(height: 24),
-          Expanded(
-            child: isLoadingStats 
-              ? const Center(child: CircularProgressIndicator(color: Colors.blueAccent))
+          isLoadingStats 
+              ? const Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator(color: Colors.blueAccent)))
               : recentActivities.isEmpty
-                  ? const Center(child: Text('لا توجد نشاطات حديثة', style: TextStyle(color: Colors.white54)))
+                  ? const Padding(padding: EdgeInsets.all(20), child: Center(child: Text('لا توجد نشاطات حديثة', style: TextStyle(color: Colors.white54))))
                   : ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
                       itemCount: recentActivities.length,
                       itemBuilder: (context, index) {
                         final data = recentActivities[index];
@@ -1003,7 +1030,6 @@ class _StaffDashboardPageState extends State<StaffDashboardPage> {
                         );
                       },
                     ),
-          )
         ],
       ),
     );
@@ -1102,18 +1128,18 @@ class _ActionCardState extends State<_ActionCard> {
             onTap: widget.onTap,
             borderRadius: BorderRadius.circular(20),
             child: Padding(
-              padding: const EdgeInsets.all(20.0),
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: widget.color.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(widget.icon, color: widget.color, size: 32),
+                    child: Icon(widget.icon, color: widget.color, size: 24),
                   ),
-                  const SizedBox(width: 20),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1121,15 +1147,15 @@ class _ActionCardState extends State<_ActionCard> {
                       children: [
                         Text(
                           widget.title, 
-                          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                          maxLines: 2,
+                          style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 4),
                         Text(
                           widget.subtitle, 
-                          style: const TextStyle(color: Colors.white54, fontSize: 13),
-                          maxLines: 2,
+                          style: const TextStyle(color: Colors.white54, fontSize: 11),
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],

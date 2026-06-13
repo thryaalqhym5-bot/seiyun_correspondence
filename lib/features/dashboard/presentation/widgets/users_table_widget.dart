@@ -128,6 +128,7 @@ class UsersTableWidget extends StatelessWidget {
           child: DataTable(
             headingRowColor: WidgetStateProperty.all(AppColors.surface2.withValues(alpha: 0.5)),
             dataRowMinHeight: 70,
+            dataRowMaxHeight: 80,
             horizontalMargin: 24,
             columnSpacing: 40,
             columns: const [

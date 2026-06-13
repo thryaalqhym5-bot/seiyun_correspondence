@@ -143,10 +143,14 @@ class CommunicationsRepository {
     return _firestore
         .collection('communications')
         .where('target_id', isEqualTo: user.uid)
-        .where('is_external', isEqualTo: true)
         .snapshots()
         .map((snapshot) {
-      final docs = snapshot.docs.map((doc) => CommunicationModel.fromJson(doc.data(), doc.id)).toList();
+      final docs = snapshot.docs
+          .map((doc) => CommunicationModel.fromJson(doc.data(), doc.id))
+          .where((model) => 
+              model.isExternal == true && 
+              !['published', 'forwarded', 'replied', 'مؤرشف', 'acknowledged', 'external_reviewed', 'archived', 'completed'].contains(model.status))
+          .toList();
       docs.sort((a, b) {
         final dateA = a.createdAt ?? DateTime.now();
         final dateB = b.createdAt ?? DateTime.now();
@@ -163,10 +167,13 @@ class CommunicationsRepository {
     return _firestore
         .collection('communications')
         .where('target_id', isEqualTo: user.uid)
-        .where('is_external', isEqualTo: true)
-        .where('is_read_by_dean', isEqualTo: false)
         .snapshots()
-        .map((snapshot) => snapshot.docs.length);
+        .map((snapshot) {
+      return snapshot.docs.where((doc) {
+        final data = doc.data();
+        return data['is_external'] == true && data['is_read_by_dean'] == false;
+      }).length;
+    });
   }
 
   Future<void> archiveCommunication(String communicationId) async {

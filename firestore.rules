@@ -22,6 +22,7 @@ service cloud.firestore {
       return isAuthenticated() && (
         resourceData.sender_id == request.auth.uid || 
         resourceData.current_rcv_id == request.auth.uid ||
+        resourceData.target_id == request.auth.uid ||
         (resourceData.recipient_ids != null && request.auth.uid in resourceData.recipient_ids) ||
         (resourceData.cc_ids != null && request.auth.uid in resourceData.cc_ids)
       );
@@ -31,6 +32,15 @@ service cloud.firestore {
     function isAdmin() {
       return isAuthenticated() && 
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    /// التحقق من أن المستخدم من الإدارة العليا
+    function isExecutive() {
+      return isAuthenticated() && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'president' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'university_president' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'secretary_general'
+      );
     }
 
     // =====================================================
@@ -58,8 +68,8 @@ service cloud.firestore {
     }
 
     match /allowed_users/{docId} {
-      // أي مستخدم مسجل يقرأ قائمة المسموح لهم
-      allow read: if isAuthenticated();
+      // أي مستخدم يقرأ قائمة المسموح لهم (لأن القراءة مطلوبة أثناء تسجيل الدخول)
+      allow read: if true;
       
       // الكتابة مقيّدة للأدمن فقط
       allow create, delete: if isAdmin();
@@ -72,28 +82,39 @@ service cloud.firestore {
       );
     }
 
+    /// التحقق من أن المستخدم سكرتير لنفس كلية المراسلة
+    function isCollegeSecretary(collegeId) {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.administrative_title == 'secretary' &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.college_id == collegeId;
+    }
+
     // =====================================================
     // 2. المراسلات (Communications — البيانات الأساسية)
     // =====================================================
 
     match /communications/{commId} {
-      // القراءة: فقط المشاركون في المراسلة، أو التعاميم المنشورة للجميع
-      allow read: if isCommunicationParticipant(resource.data) || 
-                     (resource.data.is_circular == true && resource.data.status == 'published');
+      // القراءة: الإدارة العليا تقرأ كل شيء، أو المشاركون في المراسلة، أو التعاميم، أو السكرتير لصادر كليته
+      allow read: if isExecutive() ||
+                     isCommunicationParticipant(resource.data) || 
+                     (resource.data.is_circular == true && resource.data.status == 'published') ||
+                     (resource.data.is_external_outgoing == true && isCollegeSecretary(resource.data.sender_college_id));
       
       // الإنشاء: مستخدم مسجل + sender_id يساوي uid الحالي
       allow create: if isAuthenticated() 
         && request.resource.data.sender_id == request.auth.uid;
       
-      // التعديل: المستقبل الحالي أو المرسل فقط
-      // ✅ الإصلاح C-17: لا يمكن تغيير sender_id عند التعديل
+      // التعديل: المستقبل الحالي أو المرسل، أو سكرتير الكلية لتصدير المعاملة
       allow update: if isAuthenticated() && (
-        resource.data.current_rcv_id == request.auth.uid || 
-        resource.data.sender_id == request.auth.uid
-      ) && (
-        // منع تغيير هوية المرسل الأصلي
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['sender_id'])
-        || resource.data.sender_id == request.auth.uid
+        (
+          (resource.data.current_rcv_id == request.auth.uid || resource.data.sender_id == request.auth.uid)
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['sender_id']) || resource.data.sender_id == request.auth.uid)
+        ) || (
+          resource.data.is_external_outgoing == true && 
+          isCollegeSecretary(resource.data.sender_college_id) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updated_at']) &&
+          (request.resource.data.status == 'dispatched' || request.resource.data.status == 'archived')
+        )
       );
       
       // الحذف: المرسل فقط
@@ -101,11 +122,30 @@ service cloud.firestore {
 
       // سجل التتبع (Tracking Subcollection)
       match /tracking/{trackingId} {
-        // السجل (Tracking) هو سجل تدقيق غير قابل للتعديل أو الحذف (Append-Only)
-        allow read, create: if isCommunicationParticipant(
+        allow read: if isCommunicationParticipant(
           get(/databases/$(database)/documents/communications/$(commId)).data
         );
+        allow create: if isAuthenticated() && request.resource.data.from_id == request.auth.uid;
       }
+    }
+
+    // =====================================================
+    // التنبيهات (Notifications)
+    // =====================================================
+    match /notifications/{notificationId} {
+      // Users can read their own notifications
+      allow read: if isAuthenticated() && resource.data.target_user_id == request.auth.uid;
+      
+      // Any authenticated user can create a notification for someone else
+      allow create: if isAuthenticated();
+      
+      // Users can update their own notifications (e.g. mark as read)
+      allow update: if isAuthenticated() && 
+                    resource.data.target_user_id == request.auth.uid &&
+                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['is_read']);
+      
+      // Users can delete their own notifications
+      allow delete: if isAuthenticated() && resource.data.target_user_id == request.auth.uid;
     }
 
     // =====================================================
