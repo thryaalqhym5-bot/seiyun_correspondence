@@ -37,13 +37,13 @@ class CommunicationService {
   Future<void> replyToCommunication(String commId, String replyText) => actions.replyToCommunication(commId, replyText);
   Future<void> returnDraftToSecretary(String commId, String managerNotes) => actions.returnDraftToSecretary(commId, managerNotes);
 
-  Future<void> requestDraftFromSecretary(String subject, String instructions) async {
+  Future<void> requestDraftFromSecretary(String subject, String instructions, {String? overrideSenderTitle}) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) throw 'غير مسجل الدخول';
 
     final userDoc = await _firestore.collection('users').doc(uid).get();
     final userData = userDoc.data() ?? {};
-    final myTitle = userData['administrative_title'] ?? 'staff';
+    final myTitle = overrideSenderTitle ?? userData['administrative_title'] ?? 'staff';
     
     final deanRoles = ['dean', 'deputy_dean', 'center_director', 'admin_director', 'university_president', 'university_vp', 'general_secretary'];
     if (!deanRoles.contains(myTitle)) {
@@ -164,6 +164,9 @@ class CommunicationService {
     String? parentRefNumber,
     String securityLevel = 'normal',
     bool isExternalOutgoing = false,
+    String? overrideSenderTitle,
+    String? overrideSenderDeptId,
+    String? overrideSenderCollegeId,
   }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) throw 'لا يوجد مستخدم مسجل دخول';
@@ -215,14 +218,14 @@ class CommunicationService {
     }
 
     if (!isDraft) {
-      String entityId = userData['dept_id'] ?? '';
+      String entityId = overrideSenderDeptId ?? userData['dept_id'] ?? '';
       String entityType = 'department';
       String entityCode = 'بدون';
 
-      final senderTitleTemp = userData['administrative_title'] ?? 'staff';
+      final senderTitleTemp = overrideSenderTitle ?? userData['administrative_title'] ?? 'staff';
 
       if (entityId.isEmpty || senderTitleTemp == 'dean') {
-        entityId = userData['college_id'] ?? '';
+        entityId = overrideSenderCollegeId ?? userData['college_id'] ?? '';
         entityType = 'college';
         if (entityId.isNotEmpty) {
           final colDoc = await _firestore.collection('colleges').doc(entityId).get();
@@ -247,8 +250,8 @@ class CommunicationService {
 
       if (outgoingQuery.docs.isNotEmpty) {
         senderFolderId = outgoingQuery.docs.first.id;
-        final senderTitle = userData['administrative_title'] ?? 'staff';
-        final senderCollegeId = userData['college_id'] ?? '';
+        final senderTitle = overrideSenderTitle ?? userData['administrative_title'] ?? 'staff';
+        final senderCollegeId = overrideSenderCollegeId ?? userData['college_id'] ?? '';
 
         String receiverCollegeId = '';
         final targetUserDoc = await _firestore.collection('users').doc(selectedTargetId).get();
@@ -299,7 +302,7 @@ class CommunicationService {
 
     if (receiverEntityId.isEmpty) {
       try {
-        final allowedQuery = await _firestore.collection('allowed_users').where('dept_id', isEqualTo: selectedTargetDeptId).limit(1).get();
+        final allowedQuery = await _firestore.collection('allowed_users').where('dept_ids', arrayContains: selectedTargetDeptId).limit(1).get();
         if (allowedQuery.docs.isNotEmpty) {
         } else {
           final emailQuery = await _firestore.collection('allowed_users').doc(selectedTargetId).get();
@@ -375,9 +378,9 @@ class CommunicationService {
       'body_text': bodyText,
       'sender_id': uid,
       'sender_name': effectiveSenderName,
-      'sender_dept_id': userData['dept_id'] ?? '',
-      'sender_title': userData['administrative_title'] ?? 'staff',
-      'sender_college_id': userData['college_id'] ?? '',
+      'sender_dept_id': overrideSenderDeptId ?? userData['dept_id'] ?? '',
+      'sender_title': overrideSenderTitle ?? userData['administrative_title'] ?? 'staff',
+      'sender_college_id': overrideSenderCollegeId ?? userData['college_id'] ?? '',
       'target_id': selectedTargetId,
       'target_name': selectedTargetName,
       'current_rcv_id': actualRcvId,

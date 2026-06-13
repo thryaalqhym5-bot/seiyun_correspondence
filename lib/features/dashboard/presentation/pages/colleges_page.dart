@@ -17,6 +17,7 @@ class CollegesPage extends StatefulWidget {
 
 class _CollegesPageState extends State<CollegesPage> {
   String searchQuery = '';
+  final TextEditingController searchController = TextEditingController();
   final TextEditingController collegeIdController = TextEditingController();
   final TextEditingController collegeNameController = TextEditingController();
   final TextEditingController entityCodeController = TextEditingController();
@@ -24,6 +25,7 @@ class _CollegesPageState extends State<CollegesPage> {
 
   @override
   void dispose() {
+    searchController.dispose();
     _scrollController.dispose();
     collegeIdController.dispose();
     collegeNameController.dispose();
@@ -315,6 +317,7 @@ class _CollegesPageState extends State<CollegesPage> {
                                 SizedBox(
                                   width: 300,
                                   child: TextField(
+                                    controller: searchController,
                                     style: const TextStyle(color: Colors.white, fontSize: 14),
                                     decoration: InputDecoration(
                                       hintText: 'ابحث عن جهة أو كلية...',

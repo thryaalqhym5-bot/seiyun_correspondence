@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../widgets/college_add_user_dialog.dart';
+import '../widgets/edit_user_dialog.dart';
 
 class CollegeMembersPage extends StatefulWidget {
   final String collegeId;
@@ -30,6 +31,101 @@ class _CollegeMembersPageState extends State<CollegeMembersPage> {
     );
   }
 
+  Future<void> _deleteUser(String docId, String userName, String userEmail) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('تأكيد الحذف', style: TextStyle(color: Colors.redAccent)),
+        content: Text('هل أنت متأكد من حذف حساب $userName نهائياً؟', style: const TextStyle(color: Colors.white)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء', style: TextStyle(color: Colors.white54))),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('حذف نهائي', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      final batch = FirebaseFirestore.instance.batch();
+      // Since allowed_users uses docId=email but it could be generated, docId is passed from stream.
+      batch.delete(FirebaseFirestore.instance.collection('allowed_users').doc(docId));
+      
+      // Also delete from 'users' if we can find them by email
+      final usersSnap = await FirebaseFirestore.instance.collection('users').where('email', isEqualTo: userEmail).get();
+      for (var userDoc in usersSnap.docs) {
+        batch.delete(userDoc.reference);
+      }
+      
+      await batch.commit();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حذف المستخدم بنجاح')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ أثناء الحذف: $e')));
+    }
+  }
+
+  void _showEditEmailDialog(String docId, String currentEmail, String userName) {
+    final TextEditingController emailController = TextEditingController(text: currentEmail);
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            backgroundColor: AppColors.surface,
+            title: Text('تعديل إيميل $userName', style: const TextStyle(color: Colors.white)),
+            content: TextField(
+              controller: emailController,
+              style: const TextStyle(color: Colors.white),
+              keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(
+                labelText: 'الإيميل',
+                labelStyle: const TextStyle(color: Colors.white54),
+                filled: true,
+                fillColor: const Color(0xFF112240),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('إلغاء', style: TextStyle(color: Colors.white54)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+                onPressed: isLoading ? null : () async {
+                  setState(() => isLoading = true);
+                  final newEmail = emailController.text.trim();
+                  try {
+                    await FirebaseFirestore.instance.collection('allowed_users').doc(docId).update({
+                      'emails': newEmail.isNotEmpty ? [newEmail] : [],
+                    });
+                    if (mounted) {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ الإيميل بنجاح')));
+                    }
+                  } catch (e) {
+                    setState(() => isLoading = false);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $e')));
+                    }
+                  }
+                },
+                child: isLoading ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text('حفظ', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          );
+        }
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (widget.collegeId.isEmpty) {
@@ -38,7 +134,7 @@ class _CollegeMembersPageState extends State<CollegeMembersPage> {
 
     final query = FirebaseFirestore.instance
         .collection('allowed_users')
-        .where('college_id', isEqualTo: widget.collegeId);
+        .where('college_ids', arrayContains: widget.collegeId);
 
     return Padding(
       padding: const EdgeInsets.all(32.0),
@@ -178,6 +274,27 @@ class _CollegeMembersPageState extends State<CollegeMembersPage> {
                               Text(role, style: const TextStyle(color: Colors.greenAccent)),
                             ],
                           ),
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit, color: Colors.blueAccent),
+                              tooltip: 'تعديل صلاحيات وبيانات المستخدم',
+                              onPressed: () {
+                                showDialog(
+                                  context: context,
+                                  barrierDismissible: false,
+                                  builder: (context) => EditUserDialog(docId: doc.id, data: data),
+                                );
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.redAccent),
+                              tooltip: 'حذف المستخدم نهائياً',
+                              onPressed: () => _deleteUser(doc.id, name, displayEmail),
+                            ),
+                          ],
                         ),
                       ),
                     );

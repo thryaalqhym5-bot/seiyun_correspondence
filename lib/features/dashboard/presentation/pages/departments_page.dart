@@ -9,11 +9,13 @@ import 'department_users_page.dart';
 class DepartmentsPage extends StatefulWidget {
   final String collegeId;
   final String collegeName;
+  final bool showBackButton;
 
   const DepartmentsPage({
     super.key,
     required this.collegeId,
     required this.collegeName,
+    this.showBackButton = true,
   });
 
   @override
@@ -22,6 +24,7 @@ class DepartmentsPage extends StatefulWidget {
 
 class _DepartmentsPageState extends State<DepartmentsPage> {
   String searchQuery = '';
+  final TextEditingController searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   
   final TextEditingController deptIdController = TextEditingController();
@@ -44,6 +47,7 @@ class _DepartmentsPageState extends State<DepartmentsPage> {
 
   @override
   void dispose() {
+    searchController.dispose();
     _scrollController.dispose();
     deptIdController.dispose();
     deptNameController.dispose();
@@ -257,28 +261,34 @@ class _DepartmentsPageState extends State<DepartmentsPage> {
                     children: [
                       Row(
                         children: [
-                          InkWell(
-                            onTap: () => Navigator.pop(context),
-                            borderRadius: BorderRadius.circular(12),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: AppColors.surface2,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-                              ),
-                              child: const Row(
-                                children: [
-                                  Icon(Icons.arrow_back, color: Colors.white54, size: 18),
-                                  SizedBox(width: 8),
-                                  Text('العودة للكليات', style: TextStyle(color: Colors.white54, fontSize: 14)),
-                                ],
+                          if (widget.showBackButton) ...[
+                            InkWell(
+                              onTap: () => Navigator.pop(context),
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surface2,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                                ),
+                                child: const Row(
+                                  children: [
+                                    Icon(Icons.arrow_back, color: Colors.white54, size: 18),
+                                    SizedBox(width: 8),
+                                    Text('العودة للكليات', style: TextStyle(color: Colors.white54, fontSize: 14)),
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 16),
+                            const SizedBox(width: 16),
+                            const Text(
+                              '/  ',
+                              style: TextStyle(color: Colors.white54, fontSize: 14),
+                            ),
+                          ],
                           const Text(
-                            '/  إدارة الأقسام',
+                            'إدارة الأقسام',
                             style: TextStyle(color: Colors.white54, fontSize: 14),
                           ),
                         ],
@@ -293,34 +303,67 @@ class _DepartmentsPageState extends State<DepartmentsPage> {
                       StreamBuilder<QuerySnapshot>(
                         stream: FirebaseFirestore.instance
                             .collection('allowed_users')
-                            .where('college_id', isEqualTo: widget.collegeId)
+                            .where('college_ids', arrayContains: widget.collegeId)
                             .snapshots(),
                         builder: (context, snapshot) {
                           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const SizedBox.shrink();
                           
                           final allUsers = snapshot.data!.docs;
-                          final deans = allUsers.where((doc) {
+                          final deanRoles = ['dean', 'vice_dean', 'vice_dean_student', 'vice_dean_academic', 'vice_dean_postgraduate', 'center_director', 'vice_director', 'general_director'];
+                          
+                          final List<Map<String, String>> displayLeaders = [];
+                          
+                          for (var doc in allUsers) {
                             final data = doc.data() as Map<String, dynamic>;
-                            final primaryTitle = data['administrative_title'] ?? '';
-                            final secondaryTitle = data['secondary_administrative_title'] ?? '';
-                            final deanRoles = ['dean', 'vice_dean', 'vice_dean_student', 'vice_dean_academic', 'vice_dean_postgraduate', 'center_director', 'vice_director', 'general_director'];
-                            return deanRoles.contains(primaryTitle) || deanRoles.contains(secondaryTitle);
-                          }).toList();
-
-                          if (deans.isEmpty) return const SizedBox.shrink();
-
-                          return Row(
-                            children: deans.map((doc) {
-                              final data = doc.data() as Map<String, dynamic>;
-                              final name = data['full_name'] ?? data['name'] ?? '';
-                              final primaryTitle = data['administrative_title'] ?? '';
-                              final secondaryTitle = data['secondary_administrative_title'] ?? '';
-                              
+                            final name = data['full_name'] ?? data['name'] ?? '';
+                            
+                            String primaryTitle = '';
+                            String secondaryTitle = '';
+                            
+                            if (data['affiliations'] != null && data['affiliations'] is List) {
+                              final affs = data['affiliations'] as List;
+                              for (var aff in affs) {
+                                if (aff is Map && aff['college_id'] == widget.collegeId) {
+                                  final pTitle = aff['administrative_title'] ?? '';
+                                  final sTitle = aff['secondary_administrative_title'] ?? '';
+                                  if (deanRoles.contains(pTitle) || deanRoles.contains(sTitle)) {
+                                    primaryTitle = pTitle;
+                                    secondaryTitle = sTitle;
+                                    break; 
+                                  }
+                                }
+                              }
+                            } else {
+                              primaryTitle = data['administrative_title'] ?? '';
+                              secondaryTitle = data['secondary_administrative_title'] ?? '';
+                            }
+                            
+                            if (deanRoles.contains(primaryTitle) || deanRoles.contains(secondaryTitle)) {
                               String title = 'عميد';
-                              final mainDeanRoles = ['dean', 'center_director', 'general_director'];
-                              if (!mainDeanRoles.contains(primaryTitle) && !mainDeanRoles.contains(secondaryTitle)) {
+                              final isCenterDirector = primaryTitle == 'center_director' || secondaryTitle == 'center_director';
+                              final isGeneralDirector = primaryTitle == 'general_director' || secondaryTitle == 'general_director';
+                              final isDean = primaryTitle == 'dean' || secondaryTitle == 'dean';
+                              
+                              if (isDean) {
+                                title = 'عميد';
+                              } else if (isCenterDirector) {
+                                title = 'مدير مركز';
+                              } else if (isGeneralDirector) {
+                                title = 'مدير عام';
+                              } else {
                                 title = 'نائب';
                               }
+                              
+                              displayLeaders.add({'name': name, 'title': title});
+                            }
+                          }
+
+                          if (displayLeaders.isEmpty) return const SizedBox.shrink();
+
+                          return Row(
+                            children: displayLeaders.map((leader) {
+                              final name = leader['name']!;
+                              final title = leader['title']!;
 
                               return Padding(
                                 padding: const EdgeInsets.only(left: 12.0),
@@ -404,6 +447,7 @@ class _DepartmentsPageState extends State<DepartmentsPage> {
                                 SizedBox(
                                   width: 300,
                                   child: TextField(
+                                    controller: searchController,
                                     style: const TextStyle(color: Colors.white, fontSize: 14),
                                     decoration: InputDecoration(
                                       hintText: 'ابحث عن قسم...',
@@ -474,7 +518,7 @@ class _DepartmentsPageState extends State<DepartmentsPage> {
                                           DataCell(
                                             FutureBuilder<AggregateQuerySnapshot>(
                                               future: FirebaseFirestore.instance.collection('allowed_users')
-                                                  .where('dept_id', isEqualTo: doc.id).count().get(),
+                                                  .where('dept_ids', arrayContains: doc.id).count().get(),
                                               builder: (context, snap) {
                                                 if (snap.connectionState == ConnectionState.waiting) {
                                                   return const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary));

@@ -7,6 +7,8 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/primary_button.dart';
 import '../../../../core/services/communication_service.dart';
 import '../../../../core/models/communication_model.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../../../core/models/user_model.dart';
 
 class CreateCommunicationPage extends StatefulWidget {
   final CommunicationModel? draftToEdit;
@@ -159,6 +161,24 @@ class _CreateCommunicationPageState extends State<CreateCommunicationPage> {
         }
       }
 
+      String? activeTitle;
+      String? activeCollegeId;
+      String? activeDeptId;
+      
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) {
+        final prefs = await SharedPreferences.getInstance();
+        final activeIndex = prefs.getInt('active_affiliation_$uid') ?? 0;
+        final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+        final userModel = UserModel.fromJson(doc.data() ?? {}, uid);
+        if (userModel.affiliations.isNotEmpty && activeIndex < userModel.affiliations.length) {
+          final aff = userModel.affiliations[activeIndex];
+          activeTitle = aff.administrativeTitle;
+          activeCollegeId = aff.collegeId;
+          activeDeptId = aff.deptId;
+        }
+      }
+
       await _communicationService.sendCommunication(
         subject: _subjectController.text.trim(),
         bodyText: _bodyController.text.trim(),
@@ -178,6 +198,9 @@ class _CreateCommunicationPageState extends State<CreateCommunicationPage> {
         parentCommId: widget.replyTo?.id,
         parentRefNumber: widget.replyTo?.referenceNumber,
         isExternalOutgoing: widget.isExternalReply,
+        overrideSenderTitle: activeTitle,
+        overrideSenderDeptId: activeDeptId,
+        overrideSenderCollegeId: activeCollegeId,
       );
 
       if (mounted) {
@@ -469,12 +492,12 @@ class _CreateCommunicationPageState extends State<CreateCommunicationPage> {
         {'value': 'all_deans', 'label': 'كافة عمداء الكليات'},
         {'value': 'all_college', 'label': 'كلية محددة (سيتم إضافة الميزة لاحقاً)'},
       ];
-    } else if (effectiveTitle == 'dean') {
+    } else if (effectiveTitle == 'dean' || effectiveTitle == 'center_director' || effectiveTitle == 'general_director') {
       groups = [
         {'value': 'all_college', 'label': 'كافة منسوبي الكلية'},
         {'value': 'college_management', 'label': 'نواب العميد ورؤساء الأقسام'},
       ];
-    } else if (effectiveTitle == 'vice_dean') {
+    } else if (effectiveTitle.startsWith('vice_dean') || effectiveTitle == 'vice_director' || effectiveTitle == 'college_secretary') {
       groups = [
         {'value': 'all_college', 'label': 'كافة منسوبي الكلية'},
         {'value': 'college_management', 'label': 'رؤساء الأقسام بالكلية'},

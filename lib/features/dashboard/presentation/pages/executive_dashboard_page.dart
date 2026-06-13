@@ -9,10 +9,15 @@ import '../../../communications/presentation/pages/outbox_page.dart';
 import '../../../communications/presentation/pages/user_archive_page.dart';
 import '../../../communications/presentation/pages/circulars_page.dart';
 import '../../../communications/presentation/pages/global_tracking_page.dart';
+import '../../../communications/presentation/pages/create_communication_page.dart';
 import '../../../communications/presentation/pages/pending_approvals_page.dart';
 import '../widgets/wall_reminders_widget.dart';
+import '../widgets/workspace_switcher_widget.dart';
+import '../../../../core/models/user_model.dart';
 import 'delegation_management_page.dart';
 import '../../../../core/services/communication_service.dart';
+import '../widgets/signature_setup_dialog.dart';
+import 'academic_vp_emails_page.dart';
 
 class ExecutiveDashboardPage extends StatefulWidget {
   final String fullName;
@@ -37,6 +42,8 @@ class _ExecutiveDashboardPageState extends State<ExecutiveDashboardPage> {
   int preppedCount = 0;
   bool isLoadingStats = true;
   List<Map<String, dynamic>> urgentCommunications = [];
+  UserModel? currentUserModel;
+  int activeAffiliationIndex = 0;
 
   @override
   void initState() {
@@ -48,6 +55,14 @@ class _ExecutiveDashboardPageState extends State<ExecutiveDashboardPage> {
     try {
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser != null) {
+        final userDoc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
+        final uData = userDoc.data() ?? {};
+        final userModel = UserModel.fromJson(uData, currentUser.uid);
+        
+        final prefs = await SharedPreferences.getInstance();
+        int savedIndex = prefs.getInt('active_affiliation_${currentUser.uid}') ?? 0;
+        if (savedIndex >= userModel.affiliations.length) savedIndex = 0;
+
         final inboxSnap = await FirebaseFirestore.instance
             .collection('communications')
             .where('current_rcv_id', isEqualTo: currentUser.uid)
@@ -82,6 +97,8 @@ class _ExecutiveDashboardPageState extends State<ExecutiveDashboardPage> {
 
         if (mounted) {
           setState(() {
+            currentUserModel = userModel;
+            activeAffiliationIndex = savedIndex;
             urgentCount = urgent;
             preppedCount = prepped;
             urgentCommunications = urgents.take(5).toList();
@@ -92,6 +109,17 @@ class _ExecutiveDashboardPageState extends State<ExecutiveDashboardPage> {
     } catch (e) {
       if (mounted) setState(() => isLoadingStats = false);
     }
+  }
+
+  Future<void> _switchWorkspace(int newIndex) async {
+    if (currentUserModel == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('active_affiliation_${FirebaseAuth.instance.currentUser!.uid}', newIndex);
+    
+    setState(() {
+      activeAffiliationIndex = newIndex;
+      _selectedIndex = 0; // Reset view
+    });
   }
 
   void _handleLogout() async {
@@ -115,6 +143,8 @@ class _ExecutiveDashboardPageState extends State<ExecutiveDashboardPage> {
     switch (title) {
       case 'الرئيسية':
         return _buildDashboardContent();
+      case 'إنشاء مخاطبة':
+        return const CreateCommunicationPage();
       case 'صندوق الوارد':
         return const InboxPage();
       case 'مجهزة للاعتماد':
@@ -127,6 +157,8 @@ class _ExecutiveDashboardPageState extends State<ExecutiveDashboardPage> {
         return const UserArchivePage();
       case 'تتبع شامل للمراسلات':
         return const GlobalTrackingPage();
+      case 'تفعيل إيميلات الأكاديميين':
+        return const AcademicVpEmailsPage();
       case 'إدارة التفويض والصلاحيات':
         return const DelegationManagementPage();
       default:
@@ -137,6 +169,7 @@ class _ExecutiveDashboardPageState extends State<ExecutiveDashboardPage> {
   List<SidebarItem> _getSidebarItems() {
     List<SidebarItem> items = [
       SidebarItem(title: 'الرئيسية', icon: Icons.dashboard_customize),
+      SidebarItem(title: 'إنشاء مخاطبة', icon: Icons.create),
       SidebarItem(title: 'صندوق الوارد', icon: Icons.inbox),
       SidebarItem(title: 'مجهزة للاعتماد', icon: Icons.checklist_rtl),
       SidebarItem(title: 'المراسلات الصادرة', icon: Icons.send),
@@ -146,6 +179,10 @@ class _ExecutiveDashboardPageState extends State<ExecutiveDashboardPage> {
 
     if (widget.role == 'university_president' || widget.role == 'general_secretary') {
       items.add(SidebarItem(title: 'تتبع شامل للمراسلات', icon: Icons.track_changes));
+    }
+    
+    if (widget.role == 'vp_academic_affairs') {
+      items.add(SidebarItem(title: 'تفعيل إيميلات الأكاديميين', icon: Icons.manage_accounts_outlined));
     }
     
     // All executives can manage delegations
@@ -182,6 +219,9 @@ class _ExecutiveDashboardPageState extends State<ExecutiveDashboardPage> {
             _buildHeader(),
             const SizedBox(height: 24),
             const WallRemindersWidget(),
+            const SizedBox(height: 24),
+            _buildStatsRow(),
+            const SizedBox(height: 24),
             Expanded(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -233,9 +273,21 @@ class _ExecutiveDashboardPageState extends State<ExecutiveDashboardPage> {
           children: [
             Text('القيادة العليا / واجهة الإدارة التنفيذية', style: TextStyle(color: goldAccent.withValues(alpha: 0.8), fontSize: 14)),
             const SizedBox(height: 8),
-            Text(
-              'مرحباً، ${widget.fullName}',
-              style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
+            Row(
+              children: [
+                Text(
+                  'مرحباً، ${widget.fullName}',
+                  style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
+                ),
+                if (currentUserModel != null && currentUserModel!.affiliations.length > 1) ...[
+                  const SizedBox(width: 16),
+                  WorkspaceSwitcherWidget(
+                    user: currentUserModel!,
+                    activeIndex: activeAffiliationIndex,
+                    onWorkspaceChanged: _switchWorkspace,
+                  ),
+                ],
+              ],
             ),
           ],
         ),
@@ -268,9 +320,27 @@ class _ExecutiveDashboardPageState extends State<ExecutiveDashboardPage> {
               onSelected: (value) {
                 if (value == 'logout') {
                   _handleLogout();
+                } else if (value == 'signature') {
+                  showDialog(
+                    context: context,
+                    builder: (context) => const SignatureSetupDialog(),
+                  ).then((_) {
+                    // Refresh data after signature upload if needed
+                    _loadStats();
+                  });
                 }
               },
               itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'signature',
+                  child: Row(
+                    children: [
+                      Icon(Icons.draw, color: Colors.blueAccent),
+                      const SizedBox(width: 8),
+                      const Text('إضافة توقيع'),
+                    ],
+                  ),
+                ),
                 const PopupMenuItem(
                   value: 'logout',
                   child: Row(
@@ -364,7 +434,7 @@ class _ExecutiveDashboardPageState extends State<ExecutiveDashboardPage> {
           children: [
             const Text('اختصارات عامة', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 24),
-            _ActionRow(icon: Icons.edit_document, title: 'توجيه خطاب جديد', onTap: () => setState(() => _selectedIndex = 2)), // Route to outbox or create
+            _ActionRow(icon: Icons.edit_document, title: 'توجيه خطاب جديد', onTap: () => setState(() => _selectedIndex = 1)), // Route to create
             const SizedBox(height: 16),
             _ActionRow(icon: Icons.assignment_add, title: 'طلب صياغة خطاب (للسكرتير)', onTap: () => _showDraftRequestDialog()),
             const SizedBox(height: 16),
@@ -452,9 +522,13 @@ class _ExecutiveDashboardPageState extends State<ExecutiveDashboardPage> {
                   if (subjectController.text.isEmpty || instructionsController.text.isEmpty) return;
                   setStateSB(() => isSubmitting = true);
                     try {
+                      final activeAffTitle = currentUserModel != null && currentUserModel!.affiliations.isNotEmpty 
+                          ? currentUserModel!.affiliations[activeAffiliationIndex].administrativeTitle 
+                          : null;
                       await CommunicationService().requestDraftFromSecretary(
                         subjectController.text.trim(),
-                        instructionsController.text.trim()
+                        instructionsController.text.trim(),
+                        overrideSenderTitle: activeAffTitle,
                       );
                       if (!context.mounted) return;
                       Navigator.pop(context);

@@ -38,7 +38,7 @@ class _CollegeAddUserDialogState extends State<CollegeAddUserDialog> {
     // Only load managers from the same college (like Deans or Vice Deans)
     final snap = await FirebaseFirestore.instance
         .collection('users')
-        .where('college_id', isEqualTo: widget.collegeId)
+        .where('college_ids', arrayContains: widget.collegeId)
         .where('administrative_title', whereIn: ['dean', 'vice_dean', 'vice_dean_academic', 'vice_dean_student', 'vice_dean_postgraduate', 'head_of_department'])
         .get();
     
@@ -76,11 +76,15 @@ class _CollegeAddUserDialogState extends State<CollegeAddUserDialog> {
         fullName: fullName,
         email: email,
         password: password,
-        deptId: deptId,
-        collegeId: widget.collegeId, // Use fixed college ID
+        affiliations: [
+          {
+            'college_id': widget.collegeId,
+            'dept_id': deptId,
+            'administrative_title': selectedAdminTitle,
+            'secondary_administrative_title': selectedSecondaryTitle,
+          }
+        ],
         selectedRole: selectedRole,
-        selectedAdminTitle: selectedAdminTitle,
-        selectedSecondaryTitle: selectedSecondaryTitle,
         isActive: isActive,
         managerId: selectedAdminTitle == 'secretary' ? selectedManagerId : null,
       );

@@ -14,15 +14,19 @@ class _AddUserDialogState extends State<AddUserDialog> {
   final TextEditingController fullNameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-  final TextEditingController deptIdController = TextEditingController();
-  final TextEditingController collegeIdController = TextEditingController();
 
   final UserService _userService = UserService();
 
   String selectedRole = 'staff';
-  String selectedAdminTitle = 'staff';
-  String selectedSecondaryTitle = 'none';
   String? selectedManagerId;
+  List<Map<String, dynamic>> _affiliations = [
+    {
+      'college_id': '',
+      'dept_id': '',
+      'administrative_title': 'staff',
+      'secondary_administrative_title': 'none',
+    }
+  ];
   List<Map<String, dynamic>> _managers = [];
   bool isActive = true;
   bool isSaving = false;
@@ -62,15 +66,13 @@ class _AddUserDialogState extends State<AddUserDialog> {
     final fullName = fullNameController.text.trim();
     final email = emailController.text.trim();
     final password = passwordController.text.trim();
-    final deptId = deptIdController.text.trim();
-    final collegeId = collegeIdController.text.trim();
 
-    if (fullName.isEmpty || email.isEmpty || password.isEmpty || collegeId.isEmpty) {
+    if (fullName.isEmpty || email.isEmpty || password.isEmpty || _affiliations.isEmpty || _affiliations.any((a) => (a['college_id'] as String).isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('أكملي جميع الحقول المطلوبة')));
       return;
     }
     
-    if (selectedAdminTitle == 'secretary' && selectedManagerId == null) {
+    if (_affiliations.any((a) => a['administrative_title'] == 'secretary') && selectedManagerId == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('الرجاء اختيار المدير المباشر للسكرتير')));
       return;
     }
@@ -82,13 +84,10 @@ class _AddUserDialogState extends State<AddUserDialog> {
         fullName: fullName,
         email: email,
         password: password,
-        deptId: deptId,
-        collegeId: collegeId,
         selectedRole: selectedRole,
-        selectedAdminTitle: selectedAdminTitle,
-        selectedSecondaryTitle: selectedSecondaryTitle,
         isActive: isActive,
-        managerId: selectedAdminTitle == 'secretary' ? selectedManagerId : null,
+        affiliations: _affiliations,
+        managerId: _affiliations.any((a) => a['administrative_title'] == 'secretary') ? selectedManagerId : null,
       );
 
       if (mounted) {
@@ -109,9 +108,28 @@ class _AddUserDialogState extends State<AddUserDialog> {
     fullNameController.dispose();
     emailController.dispose();
     passwordController.dispose();
-    deptIdController.dispose();
-    collegeIdController.dispose();
     super.dispose();
+  }
+
+  void _addAffiliation() {
+    setState(() {
+      _affiliations.add({
+        'college_id': '',
+        'dept_id': '',
+        'administrative_title': 'staff',
+        'secondary_administrative_title': 'none',
+      });
+    });
+  }
+
+  void _removeAffiliation(int index) {
+    if (_affiliations.length > 1) {
+      setState(() {
+        _affiliations.removeAt(index);
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يجب أن يكون للمستخدم منصب واحد على الأقل')));
+    }
   }
 
   @override
@@ -133,53 +151,127 @@ class _AddUserDialogState extends State<AddUserDialog> {
               CustomTextField(controller: passwordController, labelText: 'كلمة المرور', obscureText: true),
               const SizedBox(height: 12),
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Expanded(
-                    child: StreamBuilder<QuerySnapshot>(
-                      stream: FirebaseFirestore.instance.collection('colleges').snapshots(),
-                      builder: (context, snapshot) {
-                        if (!snapshot.hasData) return const CircularProgressIndicator();
-                        final docs = snapshot.data!.docs;
-                        return DropdownButtonFormField<String>(
-                          value: collegeIdController.text.isNotEmpty && docs.any((doc) => doc.id == collegeIdController.text) ? collegeIdController.text : null,
-                          decoration: const InputDecoration(labelText: 'الجهة (رئاسة الجامعة / الكلية)', border: OutlineInputBorder()),
-                          dropdownColor: const Color(0xFF112240),
-                          style: const TextStyle(color: Colors.white),
-                          isExpanded: true,
-                          items: docs.map((doc) => DropdownMenuItem(value: doc.id, child: Text(doc['name'] ?? ''))).toList(),
-                          onChanged: (val) {
-                            if (val != null) setState(() => collegeIdController.text = val);
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: StreamBuilder<QuerySnapshot>(
-                      stream: FirebaseFirestore.instance.collection('departments').snapshots(),
-                      builder: (context, snapshot) {
-                        if (!snapshot.hasData) return const CircularProgressIndicator();
-                        final docs = snapshot.data!.docs;
-                        return DropdownButtonFormField<String>(
-                          value: deptIdController.text.isEmpty ? '' : (docs.any((doc) => doc.id == deptIdController.text) ? deptIdController.text : null),
-                          decoration: const InputDecoration(labelText: 'القسم (اختياري)', border: OutlineInputBorder()),
-                          dropdownColor: const Color(0xFF112240),
-                          style: const TextStyle(color: Colors.white),
-                          isExpanded: true,
-                          items: [
-                            const DropdownMenuItem(value: '', child: Text('بدون قسم')),
-                            ...docs.map((doc) => DropdownMenuItem(value: doc.id, child: Text(doc['name'] ?? ''))),
-                          ],
-                          onChanged: (val) {
-                            if (val != null) setState(() => deptIdController.text = val);
-                          },
-                        );
-                      },
-                    ),
+                  const Text('المناصب والجهات', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  IconButton(
+                    icon: const Icon(Icons.add_circle, color: Colors.blueAccent),
+                    onPressed: _addAffiliation,
                   ),
                 ],
               ),
+              ...List.generate(_affiliations.length, (index) {
+                final aff = _affiliations[index];
+                return Card(
+                  color: Colors.white.withValues(alpha: 0.05),
+                  margin: const EdgeInsets.symmetric(vertical: 8),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('المنصب ${index + 1}', style: const TextStyle(color: Colors.white70)),
+                            if (_affiliations.length > 1)
+                              IconButton(
+                                icon: const Icon(Icons.delete, color: Colors.redAccent, size: 20),
+                                onPressed: () => _removeAffiliation(index),
+                              ),
+                          ],
+                        ),
+                        StreamBuilder<QuerySnapshot>(
+                          stream: FirebaseFirestore.instance.collection('colleges').snapshots(),
+                          builder: (context, snapshot) {
+                            if (!snapshot.hasData) return const CircularProgressIndicator();
+                            final docs = snapshot.data!.docs;
+                            return DropdownButtonFormField<String>(
+                              value: (aff['college_id'] as String).isNotEmpty && docs.any((doc) => doc.id == aff['college_id']) ? aff['college_id'] : null,
+                              decoration: const InputDecoration(labelText: 'الجهة (رئاسة الجامعة / الكلية)', border: OutlineInputBorder()),
+                              dropdownColor: const Color(0xFF112240),
+                              style: const TextStyle(color: Colors.white),
+                              isExpanded: true,
+                              items: docs.map((doc) => DropdownMenuItem(value: doc.id, child: Text(doc['name'] ?? ''))).toList(),
+                              onChanged: (val) {
+                                if (val != null) setState(() => _affiliations[index]['college_id'] = val);
+                              },
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        StreamBuilder<QuerySnapshot>(
+                          stream: FirebaseFirestore.instance.collection('departments').snapshots(),
+                          builder: (context, snapshot) {
+                            if (!snapshot.hasData) return const CircularProgressIndicator();
+                            final docs = snapshot.data!.docs;
+                            return DropdownButtonFormField<String>(
+                              value: (aff['dept_id'] as String).isEmpty ? '' : (docs.any((doc) => doc.id == aff['dept_id']) ? aff['dept_id'] : null),
+                              decoration: const InputDecoration(labelText: 'القسم (اختياري)', border: OutlineInputBorder()),
+                              dropdownColor: const Color(0xFF112240),
+                              style: const TextStyle(color: Colors.white),
+                              isExpanded: true,
+                              items: [
+                                const DropdownMenuItem(value: '', child: Text('بدون قسم')),
+                                ...docs.map((doc) => DropdownMenuItem(value: doc.id, child: Text(doc['name'] ?? ''))),
+                              ],
+                              onChanged: (val) {
+                                if (val != null) setState(() => _affiliations[index]['dept_id'] = val);
+                              },
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          value: aff['administrative_title'],
+                          dropdownColor: const Color(0xFF112240),
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            labelText: 'المنصب الإداري الأساسي',
+                            filled: true,
+                            fillColor: Colors.white.withValues(alpha: 0.05),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 'university_president', child: Text('رئيس الجامعة')),
+                            DropdownMenuItem(value: 'university_vp', child: Text('نائب رئيس الجامعة')),
+                            DropdownMenuItem(value: 'general_secretary', child: Text('أمين عام الجامعة')),
+                            DropdownMenuItem(value: 'dean', child: Text('عميد الكلية')),
+                            DropdownMenuItem(value: 'vice_dean', child: Text('نائب العميد')),
+                            DropdownMenuItem(value: 'vice_dean_student', child: Text('نائب العميد لشؤون الطلاب')),
+                            DropdownMenuItem(value: 'vice_dean_academic', child: Text('نائب العميد للشؤون الأكاديمية')),
+                            DropdownMenuItem(value: 'vice_dean_postgraduate', child: Text('نائب العميد للدراسات العليا')),
+                            DropdownMenuItem(value: 'center_director', child: Text('مدير مركز')),
+                            DropdownMenuItem(value: 'vice_director', child: Text('نائب مدير مركز')),
+                            DropdownMenuItem(value: 'general_director', child: Text('مدير عام')),
+                            DropdownMenuItem(value: 'head_of_department', child: Text('رئيس القسم')),
+                            DropdownMenuItem(value: 'secretary', child: Text('سكرتير / مدير مكتب')),
+                            DropdownMenuItem(value: 'staff', child: Text('لا يوجد منصب')),
+                          ],
+                          onChanged: (val) => setState(() => _affiliations[index]['administrative_title'] = val!),
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          value: aff['secondary_administrative_title'] ?? 'none',
+                          dropdownColor: const Color(0xFF112240),
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            labelText: 'المنصب الإداري الإضافي (إن وُجد)',
+                            filled: true,
+                            fillColor: Colors.white.withValues(alpha: 0.05),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 'none', child: Text('لا يوجد (None)')),
+                            DropdownMenuItem(value: 'vice_dean', child: Text('نائب العميد')),
+                            DropdownMenuItem(value: 'head_of_department', child: Text('رئيس القسم')),
+                          ],
+                          onChanged: (val) => setState(() => _affiliations[index]['secondary_administrative_title'] = val!),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 value: selectedRole,
@@ -195,44 +287,15 @@ class _AddUserDialogState extends State<AddUserDialog> {
                   DropdownMenuItem(value: 'staff', child: Text('موظف/أكاديمي (Staff)')),
                   DropdownMenuItem(value: 'admin', child: Text('مدير نظام (Admin)')),
                   DropdownMenuItem(value: 'president', child: Text('رئيس الجامعة')),
-                  DropdownMenuItem(value: 'vp_student_affairs', child: Text('نائب شؤون الطلاب')),
-                  DropdownMenuItem(value: 'vp_academic_affairs', child: Text('نائب الشؤون الأكاديمية')),
-                  DropdownMenuItem(value: 'vp_postgraduate_studies', child: Text('نائب الدراسات العليا')),
+                  DropdownMenuItem(value: 'vp_student_affairs', child: Text('نائب رئيس الجامعة لشؤون الطلاب')),
+                  DropdownMenuItem(value: 'vp_academic_affairs', child: Text('نائب رئيس الجامعة للشؤون الأكاديمية')),
+                  DropdownMenuItem(value: 'vp_postgraduate_studies', child: Text('نائب رئيس الجامعة للدراسات العليا')),
                   DropdownMenuItem(value: 'secretary_general', child: Text('الأمين العام')),
                   DropdownMenuItem(value: 'executive_secretary', child: Text('سكرتير تنفيذي / مدير مكتب')),
                 ],
                 onChanged: (value) => setState(() => selectedRole = value!),
               ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                value: selectedAdminTitle,
-                dropdownColor: const Color(0xFF112240),
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: 'المنصب الإداري الأساسي',
-                  filled: true,
-                  fillColor: Colors.white.withValues(alpha: 0.05),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'university_president', child: Text('رئيس الجامعة')),
-                  DropdownMenuItem(value: 'university_vp', child: Text('نائب رئيس الجامعة')),
-                  DropdownMenuItem(value: 'general_secretary', child: Text('أمين عام الجامعة')),
-                  DropdownMenuItem(value: 'dean', child: Text('عميد الكلية')),
-                  DropdownMenuItem(value: 'vice_dean', child: Text('نائب العميد')),
-                  DropdownMenuItem(value: 'vice_dean_student', child: Text('نائب العميد لشؤون الطلاب')),
-                  DropdownMenuItem(value: 'vice_dean_academic', child: Text('نائب العميد للشؤون الأكاديمية')),
-                  DropdownMenuItem(value: 'vice_dean_postgraduate', child: Text('نائب العميد للدراسات العليا')),
-                  DropdownMenuItem(value: 'center_director', child: Text('مدير مركز')),
-                  DropdownMenuItem(value: 'vice_director', child: Text('نائب مدير مركز')),
-                  DropdownMenuItem(value: 'general_director', child: Text('مدير عام')),
-                  DropdownMenuItem(value: 'head_of_department', child: Text('رئيس القسم')),
-                  DropdownMenuItem(value: 'secretary', child: Text('سكرتير / مدير مكتب')),
-                  DropdownMenuItem(value: 'staff', child: Text('لا يوجد منصب')),
-                ],
-                onChanged: (value) => setState(() => selectedAdminTitle = value!),
-              ),
-              if (selectedRole == 'executive_secretary' || selectedAdminTitle == 'secretary') ...[
+              if (selectedRole == 'executive_secretary' || (_affiliations.isNotEmpty && _affiliations.first['administrative_title'] == 'secretary')) ...[
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   value: _managers.any((m) => m['uid'] == selectedManagerId) ? selectedManagerId : null,
@@ -256,24 +319,6 @@ class _AddUserDialogState extends State<AddUserDialog> {
                   onChanged: (value) => setState(() => selectedManagerId = value),
                 ),
               ],
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                value: selectedSecondaryTitle,
-                dropdownColor: const Color(0xFF112240),
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: 'المنصب الإداري الإضافي (إن وُجد)',
-                  filled: true,
-                  fillColor: Colors.white.withValues(alpha: 0.05),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'none', child: Text('لا يوجد (None)')),
-                  DropdownMenuItem(value: 'vice_dean', child: Text('نائب العميد')),
-                  DropdownMenuItem(value: 'head_of_department', child: Text('رئيس القسم')),
-                ],
-                onChanged: (value) => setState(() => selectedSecondaryTitle = value!),
-              ),
               const SizedBox(height: 12),
               SwitchListTile(
                 value: isActive,

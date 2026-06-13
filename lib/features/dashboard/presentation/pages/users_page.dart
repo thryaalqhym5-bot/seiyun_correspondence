@@ -16,9 +16,21 @@ class UsersPage extends StatefulWidget {
 
 class _UsersPageState extends State<UsersPage> {
   final AdminViewModel _viewModel = AdminViewModel();
+  String searchQuery = '';
+  final TextEditingController searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  late Stream<List<UserModel>> _usersStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _usersStream = _viewModel.getUsersStream();
+  }
 
   @override
   void dispose() {
+    searchController.dispose();
+    _scrollController.dispose();
     _viewModel.dispose();
     super.dispose();
   }
@@ -84,7 +96,7 @@ class _UsersPageState extends State<UsersPage> {
               // Data Table Card
               Expanded(
                 child: StreamBuilder<List<UserModel>>(
-                  stream: _viewModel.getUsersStream(),
+                  stream: _usersStream,
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator(color: AppColors.primary));
@@ -101,7 +113,7 @@ class _UsersPageState extends State<UsersPage> {
                         final filteredUsers = allUsers.where((user) {
                           final name = user.fullName.toLowerCase();
                           final email = user.email.toLowerCase();
-                          return name.contains(_viewModel.searchQuery) || email.contains(_viewModel.searchQuery);
+                          return name.contains(searchQuery) || email.contains(searchQuery);
                         }).toList();
 
                         return AppCard(
@@ -129,9 +141,10 @@ class _UsersPageState extends State<UsersPage> {
                                     SizedBox(
                                       width: 300,
                                       child: TextField(
+                                        controller: searchController,
                                         style: const TextStyle(color: Colors.white, fontSize: 14),
                                         decoration: InputDecoration(
-                                          hintText: 'ابحث بالاسم أو البريد...',
+                                          hintText: 'ابحث بالاسم أو القسم...',
                                           hintStyle: const TextStyle(color: Colors.white38, fontSize: 14),
                                           prefixIcon: const Icon(Icons.search, color: Colors.white38, size: 18),
                                           filled: true,
@@ -139,7 +152,7 @@ class _UsersPageState extends State<UsersPage> {
                                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
                                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                                         ),
-                                        onChanged: _viewModel.setSearchQuery,
+                                        onChanged: (val) => setState(() => searchQuery = val.toLowerCase()),
                                       ),
                                     ),
                                   ],

@@ -16,17 +16,23 @@ import '../../../communications/presentation/pages/create_communication_page.dar
 import '../../../communications/presentation/pages/inbox_page.dart';
 import '../../../communications/presentation/pages/outbox_page.dart';
 import '../widgets/wall_reminders_widget.dart';
+import '../widgets/workspace_switcher_widget.dart';
+import '../../../../core/models/user_model.dart';
 import '../../../communications/presentation/pages/circulars_page.dart';
 import '../../../communications/presentation/pages/secretary_dispatch_page.dart';
 import '../../../communications/presentation/pages/returned_drafts_page.dart';
 import 'secretary_external_archive_page.dart';
 import '../../../../core/widgets/dashboard_layout.dart';
+import '../../../../core/services/communication_service.dart';
 import '../../../communications/presentation/pages/external_inbox_page.dart';
 import '../../../communications/data/communications_repository.dart';
 import 'academic_vp_emails_page.dart';
 import '../../../../core/services/communication_service.dart';
+import '../../../../core/services/notification_service.dart';
+import '../../../../core/models/notification_model.dart';
 import '../../../../core/models/communication_model.dart';
 import 'college_members_page.dart';
+import 'departments_page.dart';
 
 class StaffDashboardPage extends StatefulWidget {
   final String fullName;
@@ -54,6 +60,8 @@ class _StaffDashboardPageState extends State<StaffDashboardPage> {
   bool isLoadingStats = true;
   String? signatureUrl; // إضافة متغير التوقيع
   List<Map<String, dynamic>> recentActivities = [];
+  UserModel? currentUserModel;
+  int activeAffiliationIndex = 0;
 
   @override
   void initState() {
@@ -67,8 +75,16 @@ class _StaffDashboardPageState extends State<StaffDashboardPage> {
       if (currentUser != null && currentUser.email != null) {
         final userDoc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
         final uData = userDoc.data() ?? {};
-        final title = uData['administrative_title'] ?? 'staff';
-        final collegeId = uData['college_id'] ?? '';
+        final userModel = UserModel.fromJson(uData, currentUser.uid);
+        
+        final prefs = await SharedPreferences.getInstance();
+        int savedIndex = prefs.getInt('active_affiliation_${currentUser.uid}') ?? 0;
+        if (savedIndex >= userModel.affiliations.length) savedIndex = 0;
+        
+        final currentAff = userModel.affiliations.isNotEmpty ? userModel.affiliations[savedIndex] : null;
+        
+        final title = currentAff?.administrativeTitle ?? 'staff';
+        final collegeId = currentAff?.collegeId ?? '';
 
         final inboxSnap = await FirebaseFirestore.instance
             .collection('communications')
@@ -113,9 +129,11 @@ class _StaffDashboardPageState extends State<StaffDashboardPage> {
 
         if (mounted) {
           setState(() {
+            currentUserModel = userModel;
+            activeAffiliationIndex = savedIndex;
             userTitle = title;
             userCollegeId = collegeId;
-            signatureUrl = uData['signature_url']; // قراءة التوقيع
+            signatureUrl = uData['signature_url'];
             inboxCount = inboxToday;
             outboxCount = outboxToday;
             pendingCount = pending;
@@ -154,6 +172,20 @@ class _StaffDashboardPageState extends State<StaffDashboardPage> {
         });
       }
     }
+  }
+
+  Future<void> _switchWorkspace(int newIndex) async {
+    if (currentUserModel == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('active_affiliation_${FirebaseAuth.instance.currentUser!.uid}', newIndex);
+    
+    setState(() {
+      activeAffiliationIndex = newIndex;
+      final currentAff = currentUserModel!.affiliations[newIndex];
+      userTitle = currentAff.administrativeTitle;
+      userCollegeId = currentAff.collegeId;
+      _selectedIndex = 0; // Reset view
+    });
   }
 
   void _handleLogout() async {
@@ -200,6 +232,8 @@ class _StaffDashboardPageState extends State<StaffDashboardPage> {
         return const AcademicVpEmailsPage();
       case 'إدارة أعضاء الكلية':
         return CollegeMembersPage(collegeId: userCollegeId);
+      case 'إدارة الأقسام':
+        return DepartmentsPage(collegeId: userCollegeId, collegeName: 'الكلية', showBackButton: false);
       case 'إدارة التفويض والصلاحيات':
         return const DelegationManagementPage(); // You might need to import this if not imported
       case 'بريد جاهز للتصدير':
@@ -231,10 +265,15 @@ class _StaffDashboardPageState extends State<StaffDashboardPage> {
       items.add(SidebarItem(title: 'مسودات معادة للتعديل', icon: Icons.edit_note));
     }
 
+    // Managerial features: Approval and Delegation
     if (['dean', 'vice_dean', 'vice_dean_student', 'vice_dean_academic', 'vice_dean_postgraduate', 'center_director', 'vice_director', 'general_director', 'head_of_department', 'university_president', 'university_vp', 'general_secretary'].contains(userTitle)) {
       items.add(SidebarItem(title: 'مجهزة للاعتماد', icon: Icons.checklist_rtl));
-      items.add(SidebarItem(title: 'وارد خارجي', icon: Icons.markunread_mailbox_outlined));
       items.add(SidebarItem(title: 'إدارة التفويض والصلاحيات', icon: Icons.supervised_user_circle));
+    }
+
+    // External Inbox: Only for top-level college/center/university administrators
+    if (['dean', 'center_director', 'general_director', 'university_president', 'university_vp', 'general_secretary'].contains(userTitle)) {
+      items.add(SidebarItem(title: 'وارد خارجي', icon: Icons.markunread_mailbox_outlined));
     }
 
     if (userTitle == 'university_vp_academic') {
@@ -243,6 +282,7 @@ class _StaffDashboardPageState extends State<StaffDashboardPage> {
 
     if (userTitle == 'vice_dean_academic') {
       items.add(SidebarItem(title: 'إدارة أعضاء الكلية', icon: Icons.people_alt_outlined));
+      items.add(SidebarItem(title: 'إدارة الأقسام', icon: Icons.account_tree_outlined));
     }
 
     return items;
@@ -306,11 +346,13 @@ class _StaffDashboardPageState extends State<StaffDashboardPage> {
                               if (constraints.maxWidth > 500) crossAxisCount = 2;
                               if (constraints.maxWidth > 900) crossAxisCount = 3;
                               if (constraints.maxWidth > 1400) crossAxisCount = 4;
-                              return GridView.count(
-                                crossAxisCount: crossAxisCount,
-                                crossAxisSpacing: 16,
-                                mainAxisSpacing: 16,
-                                childAspectRatio: constraints.maxWidth < 500 ? 3.0 : 1.8,
+                              return GridView(
+                                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: crossAxisCount,
+                                  crossAxisSpacing: 16,
+                                  mainAxisSpacing: 16,
+                                  mainAxisExtent: 95,
+                                ),
                                 children: [
                               _ActionCard(
                                 title: 'بريد جاهز للتصدير',
@@ -403,11 +445,13 @@ class _StaffDashboardPageState extends State<StaffDashboardPage> {
                               if (constraints.maxWidth > 500) crossAxisCount = 2;
                               if (constraints.maxWidth > 900) crossAxisCount = 3;
                               if (constraints.maxWidth > 1400) crossAxisCount = 4;
-                              return GridView.count(
-                                crossAxisCount: crossAxisCount,
-                                crossAxisSpacing: 16,
-                                mainAxisSpacing: 16,
-                                childAspectRatio: constraints.maxWidth < 500 ? 3.0 : 1.8,
+                              return GridView(
+                                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: crossAxisCount,
+                                  crossAxisSpacing: 16,
+                                  mainAxisSpacing: 16,
+                                  mainAxisExtent: 95,
+                                ),
                                 children: [
                               _ActionCard(
                                 title: 'التعاميم الجديدة',
@@ -546,7 +590,7 @@ class _StaffDashboardPageState extends State<StaffDashboardPage> {
                                   isPrimary: true,
                                   onTap: () => setState(() => _selectedIndex = _getSidebarItems().indexWhere((i) => i.title == 'مجهزة للاعتماد')),
                                 ),
-                              if (['dean', 'vice_dean', 'vice_dean_student', 'vice_dean_academic', 'vice_dean_postgraduate', 'center_director', 'vice_director', 'general_director', 'head_of_department', 'university_president', 'university_vp', 'general_secretary'].contains(userTitle))
+                              if (['dean', 'center_director', 'general_director', 'university_president', 'university_vp', 'general_secretary'].contains(userTitle))
                                 _ExternalInboxCard(
                                   onTap: () => setState(() => _selectedIndex = _getSidebarItems().indexWhere((i) => i.title == 'وارد خارجي')),
                                 ),
@@ -586,6 +630,8 @@ class _StaffDashboardPageState extends State<StaffDashboardPage> {
                           );
                         }
                       ),
+                    const SizedBox(height: 32),
+                    _buildMiniStatsRow(),
                   ],
                 ),
               ),
@@ -600,6 +646,70 @@ class _StaffDashboardPageState extends State<StaffDashboardPage> {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniStatsRow() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'نظرة سريعة',
+          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(child: _buildMiniStatCard('وارد اليوم', inboxCount.toString(), Icons.move_to_inbox, Colors.greenAccent)),
+            const SizedBox(width: 12),
+            Expanded(child: _buildMiniStatCard('صادر اليوم', outboxCount.toString(), Icons.outbox, Colors.orangeAccent)),
+            const SizedBox(width: 12),
+            Expanded(child: _buildMiniStatCard('قيد الاعتماد', pendingCount.toString(), Icons.checklist_rtl, Colors.amberAccent)),
+            const SizedBox(width: 12),
+            Expanded(child: _buildMiniStatCard('الأرشيف', archiveCount.toString(), Icons.archive, Colors.purpleAccent)),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMiniStatCard(String title, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                Text(isLoadingStats ? '...' : value, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+              ],
+            ),
           ),
         ],
       ),
@@ -767,9 +877,21 @@ class _StaffDashboardPageState extends State<StaffDashboardPage> {
           children: [
             const Text('الرئيسية / مساحة العمل', style: TextStyle(color: Colors.white54, fontSize: 14)),
             const SizedBox(height: 8),
-            Text(
-              'مرحباً، ${widget.fullName}',
-              style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
+            Row(
+              children: [
+                Text(
+                  'مرحباً، ${widget.fullName}',
+                  style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
+                ),
+                if (currentUserModel != null && currentUserModel!.affiliations.length > 1) ...[
+                  const SizedBox(width: 16),
+                  WorkspaceSwitcherWidget(
+                    user: currentUserModel!,
+                    activeIndex: activeAffiliationIndex,
+                    onWorkspaceChanged: _switchWorkspace,
+                  ),
+                ],
+              ],
             ),
           ],
         ),
@@ -843,18 +965,14 @@ class _StaffDashboardPageState extends State<StaffDashboardPage> {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return const SizedBox.shrink();
 
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('communications')
-          .where('status', isEqualTo: 'draft_requested')
-          .where('current_rcv_id', isEqualTo: uid)
-          .snapshots(),
+    return StreamBuilder<List<NotificationModel>>(
+      stream: NotificationService().streamUnreadNotifications(uid),
       builder: (context, snapshot) {
-        final docs = snapshot.data?.docs ?? [];
-        final count = docs.length;
+        final notifications = snapshot.data ?? [];
+        final count = notifications.length;
 
-        return PopupMenuButton<DocumentSnapshot>(
-          tooltip: 'التنبيهات وطلبات الصياغة',
+        return PopupMenuButton<NotificationModel>(
+          tooltip: 'التنبيهات',
           offset: const Offset(0, 50),
           icon: Stack(
             clipBehavior: Clip.none,
@@ -877,31 +995,53 @@ class _StaffDashboardPageState extends State<StaffDashboardPage> {
             ],
           ),
           itemBuilder: (context) {
-            if (docs.isEmpty) {
+            if (notifications.isEmpty) {
               return [const PopupMenuItem(enabled: false, child: Text('لا توجد تنبيهات'))];
             }
-            return docs.map((doc) {
-              final data = doc.data() as Map<String, dynamic>;
-              return PopupMenuItem<DocumentSnapshot>(
-                value: doc,
+            return notifications.map((notif) {
+              IconData icon = Icons.notifications;
+              Color color = Colors.blueAccent;
+              
+              if (notif.type == 'draft_request') {
+                icon = Icons.edit_document;
+                color = Colors.orange;
+              } else if (notif.title.contains('مرفوضة') || notif.title.contains('تعديل')) {
+                icon = Icons.cancel;
+                color = Colors.red;
+              } else if (notif.title.contains('محالة') || notif.title.contains('خارجية')) {
+                icon = Icons.forward;
+                color = Colors.green;
+              }
+
+              return PopupMenuItem<NotificationModel>(
+                value: notif,
                 child: ListTile(
-                  leading: const Icon(Icons.edit_document, color: Colors.blueAccent),
-                  title: Text(data['subject'] ?? 'بدون عنوان', style: const TextStyle(fontSize: 14)),
-                  subtitle: Text('من: ${data['sender_name'] ?? 'المدير'}', style: const TextStyle(fontSize: 12)),
+                  leading: Icon(icon, color: color),
+                  title: Text(notif.title, style: const TextStyle(fontSize: 14)),
+                  subtitle: Text(notif.body, style: const TextStyle(fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis),
                   contentPadding: EdgeInsets.zero,
                 ),
               );
             }).toList();
           },
-          onSelected: (doc) {
-            final data = doc.data() as Map<String, dynamic>;
-            final draft = CommunicationModel.fromJson(data, doc.id);
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => CreateCommunicationPage(draftToEdit: draft),
-              ),
-            );
+          onSelected: (notif) async {
+            if (notif.id != null) {
+              await NotificationService().markAsRead(notif.id!);
+            }
+            
+            if (notif.type == 'draft_request' && notif.relatedDocId != null) {
+              final doc = await FirebaseFirestore.instance.collection('communications').doc(notif.relatedDocId).get();
+              if (doc.exists && mounted) {
+                final data = doc.data() as Map<String, dynamic>;
+                final draft = CommunicationModel.fromJson(data, doc.id);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => CreateCommunicationPage(draftToEdit: draft),
+                  ),
+                );
+              }
+            }
           },
         );
       },
@@ -947,9 +1087,13 @@ class _StaffDashboardPageState extends State<StaffDashboardPage> {
                   if (subjectController.text.isEmpty || instructionsController.text.isEmpty) return;
                   setStateSB(() => isSubmitting = true);
                   try {
+                    final activeAffTitle = currentUserModel != null && currentUserModel!.affiliations.isNotEmpty 
+                        ? currentUserModel!.affiliations[activeAffiliationIndex].administrativeTitle 
+                        : null;
                     await CommunicationService().requestDraftFromSecretary(
                       subjectController.text.trim(),
-                      instructionsController.text.trim()
+                      instructionsController.text.trim(),
+                      overrideSenderTitle: activeAffTitle,
                     );
                     if (!context.mounted) return;
                     Navigator.pop(context);

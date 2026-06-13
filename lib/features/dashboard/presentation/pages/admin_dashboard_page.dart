@@ -216,6 +216,24 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
+                          'نظرة سريعة',
+                          style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 16),
+                        if (isLoadingStats)
+                          const Center(child: CircularProgressIndicator())
+                        else
+                          Row(
+                            children: [
+                              Expanded(child: _StatCard(title: 'المستخدمين', value: usersCount.toString(), icon: Icons.people, color: Colors.blueAccent)),
+                              const SizedBox(width: 16),
+                              Expanded(child: _StatCard(title: 'الكليات والوحدات', value: collegesCount.toString(), icon: Icons.account_balance, color: Colors.teal)),
+                              const SizedBox(width: 16),
+                              Expanded(child: _StatCard(title: 'القوالب', value: templatesCount.toString(), icon: Icons.description, color: Colors.orange)),
+                            ],
+                          ),
+                        const SizedBox(height: 32),
+                        const Text(
                           'الإجراءات السريعة',
                           style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
                         ),

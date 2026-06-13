@@ -11,8 +11,14 @@ class UserService {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) throw Exception('المستخدم غير مسجل الدخول');
     final doc = await _firestore.collection('users').doc(user.uid).get();
-    if (!doc.exists || doc.data()?['role'] != 'admin') {
-      throw Exception('ليس لديك صلاحية لإجراء هذه العملية. (مطلوب صلاحية مدير نظام)');
+    final data = doc.data();
+    if (data == null) throw Exception('المستخدم غير موجود');
+    
+    final role = data['role'];
+    final adminTitles = List<String>.from(data['administrative_titles'] ?? [data['administrative_title']]);
+    
+    if (role != 'admin' && !adminTitles.contains('vice_dean_academic') && !adminTitles.contains('university_vp_academic') && data['administrative_title'] != 'vice_dean_academic') {
+      throw Exception('ليس لديك صلاحية لإجراء هذه العملية. (مطلوب صلاحية مدير نظام أو نائب عميد للشؤون الأكاديمية)');
     }
   }
 
@@ -26,12 +32,9 @@ class UserService {
     required String fullName,
     required String email,
     required String password,
-    required String deptId,
-    required String collegeId,
     required String selectedRole,
-    required String selectedAdminTitle,
-    required String selectedSecondaryTitle,
     required bool isActive,
+    required List<Map<String, dynamic>> affiliations,
     String? managerId,
   }) async {
     await _requireAdmin();
@@ -56,6 +59,16 @@ class UserService {
 
     final batch = _firestore.batch();
 
+    // Extract array properties for searching
+    final collegeIds = affiliations.map((e) => e['college_id'] as String).toList();
+    final deptIds = affiliations.map((e) => e['dept_id'] as String).toList();
+    final adminTitles = affiliations.map((e) => e['administrative_title'] as String).toList();
+    
+    // Primary affiliation for backward compatibility
+    final primary = affiliations.isNotEmpty ? affiliations.first : {
+      'college_id': '', 'dept_id': '', 'administrative_title': 'none', 'secondary_administrative_title': 'none'
+    };
+
     // 1. إضافة إلى جدول users
     final userRef = _firestore.collection('users').doc(newUid);
     batch.set(userRef, {
@@ -63,10 +76,14 @@ class UserService {
       'full_name': fullName,
       'email': email,
       'role': selectedRole,
-      'college_id': collegeId,
-      'dept_id': deptId,
-      'administrative_title': selectedAdminTitle,
-      'secondary_administrative_title': selectedSecondaryTitle,
+      'college_id': primary['college_id'],
+      'dept_id': primary['dept_id'],
+      'administrative_title': primary['administrative_title'],
+      'secondary_administrative_title': primary['secondary_administrative_title'],
+      'affiliations': affiliations,
+      'college_ids': collegeIds,
+      'dept_ids': deptIds,
+      'administrative_titles': adminTitles,
       'is_active': isActive,
       'pin': sha256.convert(utf8.encode(password)).toString(),
       if (managerId != null && managerId.isNotEmpty) 'manager_id': managerId,
@@ -79,10 +96,14 @@ class UserService {
     batch.set(allowedUserRef, {
       'full_name': fullName,
       'email': email,
-      'college_id': collegeId,
-      'dept_id': deptId,
-      'administrative_title': selectedAdminTitle,
-      'secondary_administrative_title': selectedSecondaryTitle,
+      'college_id': primary['college_id'],
+      'dept_id': primary['dept_id'],
+      'administrative_title': primary['administrative_title'],
+      'secondary_administrative_title': primary['secondary_administrative_title'],
+      'affiliations': affiliations,
+      'college_ids': collegeIds,
+      'dept_ids': deptIds,
+      'administrative_titles': adminTitles,
       'role': selectedRole,
       'is_active': isActive,
       'is_registered': true,
@@ -97,42 +118,62 @@ class UserService {
   Future<void> editUser({
     required String docId, // Email in allowed_users
     required String fullName,
-    required String deptId,
-    required String collegeId,
     required String selectedRole,
-    required String selectedAdminTitle,
-    required String selectedSecondaryTitle,
     required bool isActive,
+    required List<Map<String, dynamic>> affiliations,
     String? newPassword,
     String? managerId,
   }) async {
     await _requireAdmin();
     final batch = _firestore.batch();
 
+    // Extract array properties for searching
+    final collegeIds = affiliations.map((e) => e['college_id'] as String).toList();
+    final deptIds = affiliations.map((e) => e['dept_id'] as String).toList();
+    final adminTitles = affiliations.map((e) => e['administrative_title'] as String).toList();
+    
+    // Primary affiliation for backward compatibility
+    final primary = affiliations.isNotEmpty ? affiliations.first : {
+      'college_id': '', 'dept_id': '', 'administrative_title': 'none', 'secondary_administrative_title': 'none'
+    };
+
     // 1. التحديث في allowed_users
     final allowedUserRef = _firestore.collection('allowed_users').doc(docId);
     batch.update(allowedUserRef, {
       'full_name': fullName,
-      'college_id': collegeId,
-      'dept_id': deptId,
-      'administrative_title': selectedAdminTitle,
-      'secondary_administrative_title': selectedSecondaryTitle,
+      'college_id': primary['college_id'],
+      'dept_id': primary['dept_id'],
+      'administrative_title': primary['administrative_title'],
+      'secondary_administrative_title': primary['secondary_administrative_title'],
+      'affiliations': affiliations,
+      'college_ids': collegeIds,
+      'dept_ids': deptIds,
+      'administrative_titles': adminTitles,
       'role': selectedRole,
       'is_active': isActive,
       if (managerId != null) 'manager_id': managerId,
     });
 
     // 2. البحث عن وثيقة المستخدم في جدول users
-    final usersQuery = await _firestore.collection('users').where('email', isEqualTo: docId).get();
+    final allowedSnap = await allowedUserRef.get();
+    final allowedData = allowedSnap.data() as Map<String, dynamic>?;
+    final emailsList = List<String>.from(allowedData?['emails'] ?? [docId]);
+    if (!emailsList.contains(docId)) emailsList.add(docId);
+
+    final usersQuery = await _firestore.collection('users').where('email', whereIn: emailsList).get();
     if (usersQuery.docs.isNotEmpty) {
       final userDocId = usersQuery.docs.first.id;
       final userRef = _firestore.collection('users').doc(userDocId);
       final updateData = <String, dynamic>{
         'full_name': fullName,
-        'college_id': collegeId,
-        'dept_id': deptId,
-        'administrative_title': selectedAdminTitle,
-        'secondary_administrative_title': selectedSecondaryTitle,
+        'college_id': primary['college_id'],
+        'dept_id': primary['dept_id'],
+        'administrative_title': primary['administrative_title'],
+        'secondary_administrative_title': primary['secondary_administrative_title'],
+        'affiliations': affiliations,
+        'college_ids': collegeIds,
+        'dept_ids': deptIds,
+        'administrative_titles': adminTitles,
         'role': selectedRole,
         'is_active': isActive,
         'updated_at': FieldValue.serverTimestamp(),

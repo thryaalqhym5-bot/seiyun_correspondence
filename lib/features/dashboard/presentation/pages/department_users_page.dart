@@ -28,7 +28,7 @@ class _DepartmentUsersPageState extends State<DepartmentUsersPage> {
     super.initState();
     _usersStream = FirebaseFirestore.instance
         .collection('allowed_users')
-        .where('dept_id', isEqualTo: widget.deptId)
+        .where('dept_ids', arrayContains: widget.deptId)
         .snapshots();
   }
 

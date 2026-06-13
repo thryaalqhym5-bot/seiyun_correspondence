@@ -17,9 +17,14 @@ class ExcelService {
         onProgress('جاري فحص البيانات السابقة...');
         final existingUsersSnap = await _firestore.collection('allowed_users').get();
         final existingRoles = <String, Map<String, dynamic>>{};
+        final existingUsersByName = <String, String>{};
         for (var doc in existingUsersSnap.docs) {
           final data = doc.data();
+          if (data['full_name'] != null) {
+            existingUsersByName[data['full_name'].toString().trim()] = doc.id;
+          }
           existingRoles[doc.id] = {
+            'full_name': data['full_name'],
             'administrative_title': data['administrative_title'],
             'role': data['role'],
             'email': data['email'], // قد يكون لديهم إيميل حقيقي تمت إضافته لاحقاً
@@ -134,12 +139,28 @@ class ExcelService {
             // إنشاء معرف ثابت للموظف لمنع التكرار عند إعادة الرفع (استبدال المسافات بشرطة سفلية)
             String userDocId = '${collegeName}_${deptName}_$docName'.replaceAll(RegExp(r'\s+'), '_');
             
+            // ربط الاسم بالموظف الموجود مسبقاً في حال تم رفع القيادات قبله
+            if (existingUsersByName.containsKey(docName)) {
+                userDocId = existingUsersByName[docName]!;
+            } else {
+                for (String existingName in existingUsersByName.keys) {
+                    if (_areNamesMatching(existingName, docName)) {
+                        userDocId = existingUsersByName[existingName]!;
+                        break;
+                    }
+                }
+            }
+            
             String finalAdminTitle = adminTitle;
             String finalRole = 'staff';
             String? finalEmail; // سيكون فارغاً إلا لو تم تفعيله لاحقاً بواسطة النائب
+            String finalName = docName;
             
             if (existingRoles.containsKey(userDocId)) {
               final existingData = existingRoles[userDocId]!;
+              if (existingData['full_name'] != null) {
+                 finalName = existingData['full_name'];
+              }
               if (existingData['administrative_title'] != null && existingData['administrative_title'] != 'staff') {
                 finalAdminTitle = existingData['administrative_title'];
               }
@@ -153,14 +174,55 @@ class ExcelService {
 
             DocumentReference userRef = _firestore.collection('allowed_users').doc(userDocId);
             
+            Map<String, dynamic> newAffiliation = {
+              'college_id': collegeRef.id,
+              'dept_id': departmentRefs[deptName]!.id,
+              'administrative_title': finalAdminTitle,
+              'secondary_administrative_title': 'none',
+            };
+
             Map<String, dynamic> userData = {
-              'full_name': docName,
+              'full_name': finalName,
               'college_id': collegeRef.id,
               'dept_id': departmentRefs[deptName]!.id,
               'administrative_title': finalAdminTitle,
               'role': finalRole,
               'is_active': finalEmail != null, // يعتبر نشطاً فقط إذا كان له إيميل حقيقي
             };
+
+            List<Map<String, dynamic>> finalAffiliations = [newAffiliation];
+
+            if (existingRoles.containsKey(userDocId)) {
+               var oldData = existingRoles[userDocId]!;
+               
+               userData['college_id'] = oldData['college_id'] ?? collegeRef.id;
+               userData['dept_id'] = oldData['dept_id'] ?? departmentRefs[deptName]!.id;
+               userData['administrative_title'] = oldData['administrative_title'] ?? finalAdminTitle;
+               userData['secondary_administrative_title'] = oldData['secondary_administrative_title'] ?? 'none';
+
+               List<Map<String, dynamic>> existingAffiliations = [];
+               if (oldData['affiliations'] != null && oldData['affiliations'] is List) {
+                  existingAffiliations = List<Map<String, dynamic>>.from(oldData['affiliations'].map((e) => Map<String, dynamic>.from(e)));
+               } else {
+                  existingAffiliations.add({
+                    'college_id': oldData['college_id'] ?? '',
+                    'dept_id': oldData['dept_id'] ?? '',
+                    'administrative_title': oldData['administrative_title'] ?? 'staff',
+                    'secondary_administrative_title': oldData['secondary_administrative_title'] ?? 'none',
+                  });
+               }
+               
+               bool exists = existingAffiliations.any((a) => a['college_id'] == collegeRef.id && a['administrative_title'] == finalAdminTitle);
+               if (!exists) {
+                  existingAffiliations.add(newAffiliation);
+               }
+               finalAffiliations = existingAffiliations;
+            }
+
+            userData['affiliations'] = finalAffiliations;
+            userData['college_ids'] = finalAffiliations.map((e) => e['college_id'] as String).toList();
+            userData['dept_ids'] = finalAffiliations.map((e) => e['dept_id'] as String).toList();
+            userData['administrative_titles'] = finalAffiliations.map((e) => e['administrative_title'] as String).toList();
             
             // إضافة الإيميل للبيانات المرفوعة فقط إن وجد سابقاً
             if (finalEmail != null) {
@@ -252,7 +314,7 @@ class ExcelService {
       // إزالة المسافات قبل وبعد النص أولاً
       String res = n.trim();
       // إزالة الألقاب العلمية
-      res = res.replaceAll(RegExp(r'^(أ\.د\.|أ\.د|د\.|د|أ\.|أ|م\.|م|د/|أ/|م/|الدكتور|المهندس)\s*'), '');
+      res = res.replaceAll(RegExp(r'^(أ\.د\.|أ\.د|د\.|د/|أ\.|أ/|م\.|م/|الدكتور|المهندس|د |أ |م )\s*'), '');
       // توحيد الحروف العربية لتجنب أخطاء الإدخال
       res = res.replaceAll(RegExp(r'[أإآ]'), 'ا');
       res = res.replaceAll('ة', 'ه');
@@ -276,12 +338,137 @@ class ExcelService {
       return true;
     }
     
+    // تطابق الاسم الأول والأخير بدقة
+    if (w1.first == w2.first && w1.last == w2.last && w1.length >= 2 && w2.length >= 2) {
+        return true;
+    }
+    
     // التقاطع (عدد الكلمات المشتركة)
     int common = s1.intersection(s2).length;
-    if (common >= 3) return true; // يشتركان في 3 أسماء (مثلاً الاسم الأول واسم الأب واللقب)
-    if (common >= 2 && (w1.length <= 3 || w2.length <= 3)) return true; // اسمان فقط وهما متطابقان
+    if (common >= 3) {
+      if (w1.first == w2.first) return true;
+    }
+    if (common >= 2 && (w1.length <= 3 || w2.length <= 3)) {
+      if (w1.first == w2.first) return true;
+    }
     
     return false;
+  }
+
+  /// دالة تصحيح المكررين وحذفهم
+  Future<void> cleanDuplicates(Function(String) onProgress) async {
+    try {
+      onProgress('جاري فحص المستخدمين للبحث عن المكررين...');
+      final snap = await _firestore.collection('allowed_users').get();
+      List<DocumentSnapshot> allDocs = snap.docs;
+      
+      onProgress('تم العثور على ${allDocs.length} مستخدم. جاري البحث...');
+      
+      int deletedCount = 0;
+      WriteBatch batch = _firestore.batch();
+      
+      Set<String> processedIds = {};
+      
+      for (int i = 0; i < allDocs.length; i++) {
+        var doc1 = allDocs[i];
+        if (processedIds.contains(doc1.id)) continue;
+        
+        var data1 = doc1.data() as Map<String, dynamic>?;
+        if (data1 == null) continue;
+        String name1 = data1['full_name']?.toString().trim() ?? '';
+        if (name1.isEmpty) continue;
+        
+        List<DocumentSnapshot> duplicates = [doc1];
+        
+        for (int j = i + 1; j < allDocs.length; j++) {
+          var doc2 = allDocs[j];
+          if (processedIds.contains(doc2.id)) continue;
+          
+          var data2 = doc2.data() as Map<String, dynamic>?;
+          if (data2 == null) continue;
+          String name2 = data2['full_name']?.toString().trim() ?? '';
+          if (name2.isEmpty) continue;
+          
+          if (_areNamesMatching(name1, name2)) {
+            duplicates.add(doc2);
+          }
+        }
+        
+        if (duplicates.length > 1) {
+          for (var d in duplicates) {
+            processedIds.add(d.id);
+          }
+          
+          // تحديد الحساب الذي سنحتفظ به (نفضل الحساب الخاص بالموظف ذو الـ ID الطويل لأنه يحتوي على القسم الصحيح)
+          duplicates.sort((a, b) => b.id.length.compareTo(a.id.length));
+          
+          var docToKeep = duplicates.first;
+          var dataToKeep = docToKeep.data() as Map<String, dynamic>;
+          
+          for (int k = 1; k < duplicates.length; k++) {
+             var dup = duplicates[k];
+             var dupData = dup.data() as Map<String, dynamic>;
+             
+             if (dupData['email'] != null && dupData['email'].toString().isNotEmpty) {
+                 dataToKeep['email'] = dupData['email'];
+                 dataToKeep['emails'] = dupData['emails'] ?? dataToKeep['emails'];
+             }
+             if (dupData['is_active'] == true) {
+                 dataToKeep['is_active'] = true;
+             }
+             if (dupData['is_registered'] == true) {
+                 dataToKeep['is_registered'] = true;
+             }
+             if (dupData['administrative_title'] != null && dupData['administrative_title'] != 'staff') {
+                 dataToKeep['administrative_title'] = dupData['administrative_title'];
+                 dataToKeep['secondary_administrative_title'] = dupData['secondary_administrative_title'] ?? 'none';
+                 dataToKeep['raw_title'] = dupData['raw_title'] ?? dataToKeep['raw_title'];
+             }
+             if (dupData['full_name'] != null && dupData['full_name'].toString().contains('د.')) {
+                 dataToKeep['full_name'] = dupData['full_name'];
+             }
+             if (dataToKeep['college_id'] == null || dataToKeep['college_id'].toString().isEmpty) {
+                 dataToKeep['college_id'] = dupData['college_id'];
+             }
+             if (dataToKeep['dept_id'] == null || dataToKeep['dept_id'].toString().isEmpty) {
+                 dataToKeep['dept_id'] = dupData['dept_id'];
+             }
+             
+             batch.delete(dup.reference);
+             deletedCount++;
+          }
+          
+          batch.set(docToKeep.reference, dataToKeep, SetOptions(merge: true));
+
+          // تحديث الحساب الموثق في حال كان قد سجل دخوله مسبقاً
+          if (dataToKeep['email'] != null) {
+              final usersQuery = await _firestore.collection('users').where('email', isEqualTo: dataToKeep['email']).get();
+              if (usersQuery.docs.isNotEmpty) {
+                  final userRef = _firestore.collection('users').doc(usersQuery.docs.first.id);
+                  batch.update(userRef, {
+                      'full_name': dataToKeep['full_name'],
+                      'administrative_title': dataToKeep['administrative_title'],
+                      'secondary_administrative_title': dataToKeep['secondary_administrative_title'] ?? 'none',
+                      'college_id': dataToKeep['college_id'],
+                      'dept_id': dataToKeep['dept_id'],
+                      'is_active': dataToKeep['is_active'],
+                  });
+              }
+          }
+        }
+      }
+      
+      if (deletedCount > 0) {
+        onProgress('جاري حذف $deletedCount حساب مكرر ودمج بياناتهم...');
+        await batch.commit();
+        onProgress('تم تنظيف المكررين بنجاح!');
+      } else {
+        onProgress('لم يتم العثور على أي حسابات مكررة.');
+      }
+      
+    } catch (e) {
+      onProgress('حدث خطأ أثناء تنظيف المكررين: $e');
+    }
   }
 
   Future<int> _processLeadershipData(List<List<dynamic>> rows, String sheetName, Function(String) onProgress) async {
@@ -292,10 +479,12 @@ class ExcelService {
       onProgress('جاري فحص البيانات السابقة لربط الأسماء...');
       final existingUsersSnap = await _firestore.collection('allowed_users').get();
       final existingUsersByName = <String, String>{};
+      final existingUserData = <String, Map<String, dynamic>>{};
       for (var doc in existingUsersSnap.docs) {
         final data = doc.data();
         if (data['full_name'] != null) {
           existingUsersByName[data['full_name'].toString().trim()] = doc.id;
+          existingUserData[doc.id] = data;
         }
       }
 
@@ -459,17 +648,60 @@ class ExcelService {
 
           DocumentReference userRef = _firestore.collection('allowed_users').doc(userDocId);
           
-          Map<String, dynamic> userData = {
-            'full_name': name,
+          Map<String, dynamic> newAffiliation = {
+            'college_id': entityId,
+            'dept_id': deptId.isNotEmpty ? deptId : '',
             'administrative_title': adminTitle,
             'secondary_administrative_title': secondaryTitle,
-            'raw_title': position, // Save exactly what was in the Excel file
+          };
+
+          Map<String, dynamic> userData = {
+            'full_name': name,
+            'raw_title': position,
             'role': role,
             'college_id': entityId,
+            'administrative_title': adminTitle,
+            'secondary_administrative_title': secondaryTitle,
           };
           if (deptId.isNotEmpty) {
              userData['dept_id'] = deptId;
           }
+
+          List<Map<String, dynamic>> finalAffiliations = [newAffiliation];
+
+          // الحفاظ على الكلية والقسم الأصلية ودمج المناصب
+          if (existingUserData.containsKey(userDocId)) {
+             var oldData = existingUserData[userDocId]!;
+             
+             userData['college_id'] = oldData['college_id'] ?? entityId;
+             userData['dept_id'] = oldData['dept_id'] ?? deptId;
+             userData['administrative_title'] = oldData['administrative_title'] ?? adminTitle;
+             userData['secondary_administrative_title'] = oldData['secondary_administrative_title'] ?? secondaryTitle;
+             
+             List<Map<String, dynamic>> existingAffiliations = [];
+             if (oldData['affiliations'] != null && oldData['affiliations'] is List) {
+                existingAffiliations = List<Map<String, dynamic>>.from(oldData['affiliations'].map((e) => Map<String, dynamic>.from(e)));
+             } else {
+                existingAffiliations.add({
+                  'college_id': oldData['college_id'] ?? '',
+                  'dept_id': oldData['dept_id'] ?? '',
+                  'administrative_title': oldData['administrative_title'] ?? 'staff',
+                  'secondary_administrative_title': oldData['secondary_administrative_title'] ?? 'none',
+                });
+             }
+             
+             bool exists = existingAffiliations.any((a) => a['college_id'] == entityId && a['administrative_title'] == adminTitle);
+             if (!exists) {
+                existingAffiliations.add(newAffiliation);
+             }
+             finalAffiliations = existingAffiliations;
+          }
+
+          userData['affiliations'] = finalAffiliations;
+          userData['college_ids'] = finalAffiliations.map((e) => e['college_id'] as String).toList();
+          userData['dept_ids'] = finalAffiliations.map((e) => e['dept_id'] as String).toList();
+          userData['administrative_titles'] = finalAffiliations.map((e) => e['administrative_title'] as String).toList();
+
           if (primaryEmail.isNotEmpty) {
              userData['email'] = primaryEmail;
              userData['emails'] = extractedEmails;

@@ -7,8 +7,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:open_filex/open_filex.dart';
 import '../../../../core/services/communication_service.dart';
+import '../../../../core/models/communication_model.dart';
 import '../widgets/forward_dialog.dart';
 import 'tracking_page.dart';
+import 'create_communication_page.dart';
 
 class PdfViewPage extends StatefulWidget {
   final String? pdfUrl;
@@ -689,8 +691,26 @@ class _PdfViewPageState extends State<PdfViewPage> {
                           child: ElevatedButton.icon(
                             style: ElevatedButton.styleFrom(backgroundColor: Colors.purpleAccent),
                             onPressed: _showReplyDialog,
-                            icon: const Icon(Icons.reply, color: Colors.white),
-                            label: const Text('رد', style: TextStyle(color: Colors.white)),
+                            icon: const Icon(Icons.note_add, color: Colors.white),
+                            label: const Text('إفادة', style: TextStyle(color: Colors.white)),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo),
+                            onPressed: () {
+                              final draft = CommunicationModel.fromJson(data, widget.communicationId);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => CreateCommunicationPage(replyTo: draft),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.reply_all, color: Colors.white),
+                            label: const Text('رد رسمي', style: TextStyle(color: Colors.white)),
                           ),
                         ),
                         const SizedBox(width: 8),

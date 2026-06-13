@@ -1,5 +1,37 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+class Affiliation {
+  final String collegeId;
+  final String deptId;
+  final String administrativeTitle;
+  final String secondaryAdministrativeTitle;
+
+  Affiliation({
+    required this.collegeId,
+    required this.deptId,
+    required this.administrativeTitle,
+    required this.secondaryAdministrativeTitle,
+  });
+
+  factory Affiliation.fromJson(Map<String, dynamic> json) {
+    return Affiliation(
+      collegeId: json['college_id'] as String? ?? '',
+      deptId: json['dept_id'] as String? ?? '',
+      administrativeTitle: json['administrative_title'] as String? ?? 'none',
+      secondaryAdministrativeTitle: json['secondary_administrative_title'] as String? ?? 'none',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'college_id': collegeId,
+      'dept_id': deptId,
+      'administrative_title': administrativeTitle,
+      'secondary_administrative_title': secondaryAdministrativeTitle,
+    };
+  }
+}
+
 class UserModel {
   final String? uid;
   final String fullName;
@@ -14,6 +46,11 @@ class UserModel {
   final DateTime? updatedAt;
   final String? managerId; // Can point to the executive's UID if role is executive_secretary
   final String? rawTitle; // Exact job title from Excel
+
+  final List<Affiliation> affiliations;
+  final List<String> collegeIds;
+  final List<String> deptIds;
+  final List<String> administrativeTitles;
 
   bool get isExecutive => const [
         'president',
@@ -38,6 +75,10 @@ class UserModel {
     this.updatedAt,
     this.managerId,
     this.rawTitle,
+    this.affiliations = const [],
+    this.collegeIds = const [],
+    this.deptIds = const [],
+    this.administrativeTitles = const [],
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json, [String? id]) {
@@ -61,7 +102,33 @@ class UserModel {
       updatedAt: parseDate(json['updated_at']),
       managerId: json['manager_id'] as String?,
       rawTitle: json['raw_title'] as String?,
+      affiliations: _parseAffiliations(json),
+      collegeIds: _parseStringList(json['college_ids']) ?? [json['college_id'] as String? ?? ''],
+      deptIds: _parseStringList(json['dept_ids']) ?? [json['dept_id'] as String? ?? ''],
+      administrativeTitles: _parseStringList(json['administrative_titles']) ?? [json['administrative_title'] as String? ?? 'none'],
     );
+  }
+
+  static List<String>? _parseStringList(dynamic val) {
+    if (val is List) {
+      return val.map((e) => e.toString()).toList();
+    }
+    return null;
+  }
+
+  static List<Affiliation> _parseAffiliations(Map<String, dynamic> json) {
+    if (json['affiliations'] != null && json['affiliations'] is List) {
+      return (json['affiliations'] as List).map((e) => Affiliation.fromJson(e as Map<String, dynamic>)).toList();
+    }
+    // Backward compatibility
+    return [
+      Affiliation(
+        collegeId: json['college_id'] as String? ?? '',
+        deptId: json['dept_id'] as String? ?? '',
+        administrativeTitle: json['administrative_title'] as String? ?? 'none',
+        secondaryAdministrativeTitle: json['secondary_administrative_title'] as String? ?? 'none',
+      )
+    ];
   }
 
   Map<String, dynamic> toJson() {
@@ -79,6 +146,10 @@ class UserModel {
       'updated_at': FieldValue.serverTimestamp(),
       if (managerId != null) 'manager_id': managerId,
       if (rawTitle != null) 'raw_title': rawTitle,
+      'affiliations': affiliations.map((e) => e.toJson()).toList(),
+      'college_ids': collegeIds,
+      'dept_ids': deptIds,
+      'administrative_titles': administrativeTitles,
     };
   }
 
@@ -96,6 +167,7 @@ class UserModel {
       if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
       if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
       if (managerId != null) 'manager_id': managerId,
+      'affiliations': affiliations.map((e) => e.toJson()).toList(),
     };
   }
 
@@ -112,6 +184,10 @@ class UserModel {
     DateTime? createdAt,
     DateTime? updatedAt,
     String? managerId,
+    List<Affiliation>? affiliations,
+    List<String>? collegeIds,
+    List<String>? deptIds,
+    List<String>? administrativeTitles,
   }) {
     return UserModel(
       uid: uid ?? this.uid,
@@ -126,6 +202,10 @@ class UserModel {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       managerId: managerId ?? this.managerId,
+      affiliations: affiliations ?? this.affiliations,
+      collegeIds: collegeIds ?? this.collegeIds,
+      deptIds: deptIds ?? this.deptIds,
+      administrativeTitles: administrativeTitles ?? this.administrativeTitles,
     );
   }
 }

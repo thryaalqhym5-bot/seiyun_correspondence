@@ -107,11 +107,15 @@ class RoutingService {
     final allUsers = snapshot.docs;
 
     return allUsers.where((doc) {
-      if (doc.id == _auth.currentUser?.email) return false;
-      if (managerEmail != null && doc.id == managerEmail) return false;
+      if (doc.id.toLowerCase() == _auth.currentUser?.email?.toLowerCase()) return false;
+      if (managerEmail != null && doc.id.toLowerCase() == managerEmail.toLowerCase()) return false;
 
       final data = doc.data();
-      final targetTitle = data['administrative_title'] ?? 'staff';
+      String targetTitle = data['administrative_title'] ?? 'staff';
+      final targetSecTitle = data['secondary_administrative_title'] ?? 'none';
+      if (targetTitle == 'staff' && targetSecTitle != 'none') {
+        targetTitle = targetSecTitle;
+      }
       final targetCollegeId = data['college_id'] ?? '';
       final targetDeptId = data['dept_id'] ?? '';
       final targetRole = data['role'] ?? 'staff';
@@ -122,17 +126,27 @@ class RoutingService {
       
       if (title == 'university_president') {
         return true;
-      } else if (deanRoles.contains(title)) {
-        if (targetTitle == 'university_president') return true;
-        if (deanRoles.contains(targetTitle)) return true;
-        if (targetTitle == 'head_of_department' && targetCollegeId == collegeId) return true;
+      } else if (title == 'dean' || title == 'general_director' || title == 'center_director') {
+        // Deans can send to President, VPs, other Deans, and their own college management
+        if (targetTitle == 'university_president' || targetTitle == 'university_vp' || targetTitle == 'university_vp_academic') return true;
+        if (targetTitle == 'dean' || targetTitle == 'general_director' || targetTitle == 'center_director') return true;
+        if (targetCollegeId == collegeId && (targetTitle.startsWith('vice_dean') || targetTitle == 'head_of_department' || targetTitle == 'college_secretary')) return true;
+        return false;
+      } else if (title.startsWith('vice_dean') || title == 'vice_director' || title == 'college_secretary') {
+        // Vice Deans / College Secretary can only send to their own Dean, peers, and HoDs in the SAME college
+        if (targetCollegeId == collegeId) {
+          if (targetTitle == 'dean' || targetTitle == 'center_director' || targetTitle == 'general_director') return true;
+          if (targetTitle.startsWith('vice_dean') || targetTitle == 'college_secretary') return true;
+          if (targetTitle == 'head_of_department') return true;
+        }
         return false;
       } else if (title == 'head_of_department') {
+        // HoD can send to their Dean/Vice Deans, other HoDs in same college, and their own department staff
+        if (targetCollegeId == collegeId && (targetTitle == 'dean' || targetTitle.startsWith('vice_dean') || targetTitle == 'head_of_department' || targetTitle == 'college_secretary')) return true;
         if (targetTitle == 'staff' && targetDeptId == deptId) return true;
-        if (deanRoles.contains(targetTitle) &&
-            targetCollegeId == collegeId) return true;
         return false;
       } else {
+        // Staff can only send to their own HoD
         if (targetTitle == 'head_of_department' && targetDeptId == deptId) return true;
         return false;
       }

@@ -263,6 +263,45 @@ class _AdminUploadPageState extends State<AdminUploadPage> {
     }
   }
 
+  Future<void> _startCleanDuplicates() async {
+    setState(() {
+      _isUploading = true;
+      _statusMessage = 'جاري بدء عملية التنظيف...';
+      _uploadSuccess = false;
+    });
+
+    _startFakeProgress();
+
+    try {
+      await _excelService.cleanDuplicates((message) {
+        if (mounted) {
+          setState(() {
+            _statusMessage = message;
+          });
+        }
+      });
+
+      _progressTimer?.cancel();
+
+      if (mounted) {
+        setState(() {
+          _progressValue = 1.0;
+          _isUploading = false;
+          _uploadSuccess = true;
+        });
+      }
+    } catch (e) {
+      _progressTimer?.cancel();
+      if (mounted) {
+        setState(() {
+          _isUploading = false;
+          _statusMessage = 'حدث خطأ غير متوقع أثناء التنظيف.';
+        });
+        _showErrorSnackBar('خطأ تقني: $e');
+      }
+    }
+  }
+
   void _reset() {
     setState(() {
       _selectedFilePath = null;
@@ -341,6 +380,17 @@ class _AdminUploadPageState extends State<AdminUploadPage> {
                                 selectedColor: Colors.orangeAccent.withValues(alpha: 0.2),
                                 labelStyle: TextStyle(color: _isLeadershipFile ? Colors.orangeAccent : Colors.white70, fontWeight: FontWeight.bold),
                                 backgroundColor: surfaceColor,
+                              ),
+                              const Spacer(),
+                              ElevatedButton.icon(
+                                onPressed: _isUploading ? null : _startCleanDuplicates,
+                                icon: const Icon(Icons.cleaning_services, size: 18),
+                                label: const Text('تنظيف الحسابات المكررة', style: TextStyle(fontWeight: FontWeight.bold)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.redAccent.withValues(alpha: 0.2),
+                                  foregroundColor: Colors.redAccent,
+                                  elevation: 0,
+                                ),
                               ),
                             ],
                           ),

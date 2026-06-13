@@ -138,9 +138,16 @@ class _LoginPageState extends State<LoginPage> {
 
       await FirebaseFirestore.instance.collection('users').doc(user.uid).set(userMap);
       await allowedUserDoc.reference.update({'is_registered': true});
+    } else {
+      // Sync affiliations from allowed_users to users if already registered
+      if (data.containsKey('affiliations')) {
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'affiliations': data['affiliations'],
+        }, SetOptions(merge: true));
+      }
     }
 
-    final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+    var userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
 
     if (!userDoc.exists) {
       setState(() => errorMessage = 'بيانات المستخدم غير موجودة في قاعدة البيانات الأساسية');

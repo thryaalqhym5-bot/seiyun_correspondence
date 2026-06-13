@@ -31,11 +31,18 @@ class NotificationService {
     return _firestore
         .collection('notifications')
         .where('target_user_id', isEqualTo: userId)
-        .where('is_read', isEqualTo: false)
-        .orderBy('created_at', descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map((doc) => NotificationModel.fromJson(doc.data(), doc.id)).toList();
+      final docs = snapshot.docs
+          .map((doc) => NotificationModel.fromJson(doc.data(), doc.id))
+          .where((n) => !n.isRead)
+          .toList();
+      docs.sort((a, b) {
+        final aDate = a.createdAt ?? DateTime.now();
+        final bDate = b.createdAt ?? DateTime.now();
+        return bDate.compareTo(aDate); // descending
+      });
+      return docs;
     });
   }
 
