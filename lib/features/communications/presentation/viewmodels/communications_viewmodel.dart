@@ -13,6 +13,14 @@ class CommunicationsViewModel extends ChangeNotifier {
     return _repository.getInboxStream();
   }
 
+  Stream<List<Map<String, dynamic>>> getTrackingStream(String commId) {
+    return _repository.getTrackingStream(commId);
+  }
+
+  Stream<List<CommunicationModel>> getDelegatedInboxStream() {
+    return _repository.getDelegatedInboxStream();
+  }
+
   Stream<List<CommunicationModel>> getOutboxStream() {
     return _repository.getOutboxStream();
   }

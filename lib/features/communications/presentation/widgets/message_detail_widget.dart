@@ -7,6 +7,7 @@ import '../../../../core/models/communication_model.dart';
 import '../../../../core/services/word_service.dart';
 import '../../../../core/services/communication_service.dart';
 import '../pages/create_communication_page.dart';
+import 'tracking_timeline_dialog.dart';
 
 class MessageDetailWidget extends StatelessWidget {
   final CommunicationModel? message;
@@ -69,6 +70,7 @@ class MessageDetailWidget extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          _ReadMarker(commId: message!.id),
           // Details Header
           Container(
             padding: const EdgeInsets.all(32),
@@ -96,7 +98,39 @@ class MessageDetailWidget extends StatelessWidget {
                             child: _buildBadge('وارد خارجي', Colors.orangeAccent),
                           ),
                         _buildBadge(message!.status, AppColors.success),
-                        const SizedBox(width: 8),
+                        FutureBuilder<DocumentSnapshot>(
+                          future: FirebaseFirestore.instance.collection('users').doc(currentUser?.uid).get(),
+                          builder: (context, snapshot) {
+                            bool isVisible = false;
+                            if (message!.senderId == currentUser?.uid) {
+                              isVisible = true;
+                            } else if (snapshot.hasData && snapshot.data?.data() != null) {
+                              final userData = snapshot.data!.data() as Map<String, dynamic>;
+                              final title = userData['administrative_title'] as String? ?? '';
+                              final userCollegeId = userData['college_id'] as String? ?? '';
+                              
+                              if (title == 'university_president' || title == 'university_vp') {
+                                isVisible = true;
+                              } else if ((title == 'dean' || title == 'general_secretary' || title == 'center_director') && 
+                                         message!.senderCollegeId == userCollegeId && userCollegeId.isNotEmpty) {
+                                isVisible = true;
+                              }
+                            }
+                            
+                            if (!isVisible) return const SizedBox.shrink();
+                            
+                            return IconButton(
+                              icon: const Icon(Icons.timeline, color: Colors.blueAccent),
+                              onPressed: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (ctx) => TrackingTimelineDialog(commId: message!.id!),
+                                );
+                              },
+                              tooltip: 'مسار المعاملة',
+                            );
+                          },
+                        ),
                         // زر الرد يظهر للمراسلات الواردة، أو إذا كان هناك إجراء مخصص (مثل حائط التذكيرات)
                         if (!effectiveIsOutgoing || onReply != null)
                           IconButton(
@@ -645,5 +679,34 @@ class MessageDetailWidget extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ReadMarker extends StatefulWidget {
+  final String? commId;
+  const _ReadMarker({required this.commId});
+  @override
+  _ReadMarkerState createState() => _ReadMarkerState();
+}
+
+class _ReadMarkerState extends State<_ReadMarker> {
+  @override
+  void initState() {
+    super.initState();
+    _markRead();
+  }
+  @override
+  void didUpdateWidget(covariant _ReadMarker oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.commId != widget.commId) {
+      _markRead();
+    }
+  }
+  void _markRead() {
+    if (widget.commId != null && widget.commId!.isNotEmpty) {
+      CommunicationService().markAsReadIfNeeded(widget.commId!);
+    }
+  }
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
 }
 

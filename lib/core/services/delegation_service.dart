@@ -87,4 +87,27 @@ class DelegationService {
     }
     return false;
   }
+
+  /// جلب قائمة بالمعرفات (المدراء) الذين فوضوا المستخدم الحالي وتفويضهم نشط حالياً
+  Future<List<String>> getActiveDelegatorsForUser() async {
+    final user = _auth.currentUser;
+    if (user == null) return [];
+
+    final now = DateTime.now();
+    final query = await _firestore
+        .collection('delegations')
+        .where('delegatee_id', isEqualTo: user.uid)
+        .where('status', isEqualTo: 'active')
+        .get();
+
+    List<String> delegatorIds = [];
+    for (var doc in query.docs) {
+      final start = (doc['start_date'] as Timestamp).toDate();
+      final end = (doc['end_date'] as Timestamp).toDate();
+      if (now.isAfter(start) && now.isBefore(end)) {
+        delegatorIds.add(doc['delegator_id']);
+      }
+    }
+    return delegatorIds;
+  }
 }

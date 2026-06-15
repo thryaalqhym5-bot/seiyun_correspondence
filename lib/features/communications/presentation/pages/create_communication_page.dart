@@ -465,7 +465,7 @@ class _CreateCommunicationPageState extends State<CreateCommunicationPage> {
   }
 
   Widget _buildDropdown(String label, List<Map<String, String>> items, String value, Function(String?) onChanged) {
-    return DropdownButtonFormField<String>(value: value, decoration: InputDecoration(labelText: label), style: const TextStyle(color: Colors.white), dropdownColor: const Color(0xFF112240), items: items.map((e) => DropdownMenuItem(value: e['value'], child: Text(e['label']!))).toList(), onChanged: onChanged);
+    return DropdownButtonFormField<String>(initialValue: value, decoration: InputDecoration(labelText: label), style: const TextStyle(color: Colors.white), dropdownColor: const Color(0xFF112240), items: items.map((e) => DropdownMenuItem(value: e['value'], child: Text(e['label']!))).toList(), onChanged: onChanged);
   }
 
   String _getGroupName(String groupId) {
@@ -486,7 +486,7 @@ class _CreateCommunicationPageState extends State<CreateCommunicationPage> {
     
     List<Map<String, String>> groups = [];
 
-    if (effectiveTitle == 'university_president') {
+    if (['university_president', 'university_vp', 'general_secretary'].contains(effectiveTitle)) {
       groups = [
         {'value': 'all_university', 'label': 'كافة منسوبي الجامعة'},
         {'value': 'all_deans', 'label': 'كافة عمداء الكليات'},
@@ -516,7 +516,7 @@ class _CreateCommunicationPageState extends State<CreateCommunicationPage> {
     }
 
     return DropdownButtonFormField<String>(
-      value: groups.any((g) => g['value'] == _selectedTargetGroup) ? _selectedTargetGroup : null,
+      initialValue: groups.any((g) => g['value'] == _selectedTargetGroup) ? _selectedTargetGroup : null,
       decoration: const InputDecoration(labelText: 'المجموعة المستهدفة', prefixIcon: Icon(Icons.groups, color: Colors.blueAccent)),
       style: const TextStyle(color: Colors.white),
       dropdownColor: const Color(0xFF112240),
@@ -532,7 +532,7 @@ class _CreateCommunicationPageState extends State<CreateCommunicationPage> {
         if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
         final availableDocs = snapshot.data ?? [];
         return DropdownButtonFormField<String>(
-          value: availableDocs.any((d) => d.id == _selectedTargetId) ? _selectedTargetId : null,
+          initialValue: availableDocs.any((d) => d.id == _selectedTargetId) ? _selectedTargetId : null,
           decoration: const InputDecoration(labelText: 'المستقبل', prefixIcon: Icon(Icons.person_search, color: Colors.blueAccent)),
           style: const TextStyle(color: Colors.white),
           dropdownColor: const Color(0xFF112240),
@@ -558,7 +558,7 @@ class _CreateCommunicationPageState extends State<CreateCommunicationPage> {
         if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
         final docs = snapshot.data?.docs ?? [];
         return DropdownButtonFormField<String>(
-          value: docs.any((d) => d.id == _selectedTemplateId) ? _selectedTemplateId : null,
+          initialValue: docs.any((d) => d.id == _selectedTemplateId) ? _selectedTemplateId : null,
           decoration: const InputDecoration(labelText: 'قالب الكليشة', prefixIcon: Icon(Icons.description_outlined, color: Colors.blueAccent)),
           style: const TextStyle(color: Colors.white),
           dropdownColor: const Color(0xFF112240),

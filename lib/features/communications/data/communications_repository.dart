@@ -1,10 +1,46 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../../../core/models/communication_model.dart';
+import '../../../../core/services/delegation_service.dart';
 
 class CommunicationsRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  Stream<List<CommunicationModel>> getDelegatedInboxStream() async* {
+    final user = _auth.currentUser;
+    if (user == null) {
+      yield [];
+      return;
+    }
+
+    final delegationService = DelegationService();
+    final delegators = await delegationService.getActiveDelegatorsForUser();
+
+    if (delegators.isEmpty) {
+      yield [];
+      return;
+    }
+
+    yield* _firestore
+        .collection('communications')
+        .where('current_rcv_id', whereIn: delegators)
+        .where('status', whereIn: ['sent', 'pending', 'قيد المعالجة', 'قيد الانتظار', ''])
+        .snapshots()
+        .map((snapshot) {
+      final docs = snapshot.docs.map((doc) => CommunicationModel.fromJson(doc.data(), doc.id)).toList();
+      docs.sort((a, b) {
+        final dateA = a.createdAt ?? DateTime.now();
+        final dateB = b.createdAt ?? DateTime.now();
+        return dateB.compareTo(dateA);
+      });
+      // إضافة علامة لتمييز المعاملة بأنها مفوضة
+      for (var doc in docs) {
+        doc.isDelegated = true; // نفترض إضافة هذا الحقل لاحقاً
+      }
+      return docs;
+    });
+  }
 
   Stream<List<CommunicationModel>> getInboxStream() {
     final user = _auth.currentUser;
@@ -200,6 +236,18 @@ class CommunicationsRepository {
         return dateB.compareTo(dateA);
       });
       return docs;
+    });
+  }
+
+  Stream<List<Map<String, dynamic>>> getTrackingStream(String commId) {
+    return _firestore
+        .collection('communications')
+        .doc(commId)
+        .collection('tracking')
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList();
     });
   }
 }

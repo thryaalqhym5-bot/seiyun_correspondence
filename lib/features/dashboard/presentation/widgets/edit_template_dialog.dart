@@ -148,7 +148,7 @@ class _EditTemplateDialogState extends State<EditTemplateDialog> {
               CustomTextField(controller: templateNameController, labelText: 'اسم القالب'),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                value: selectedTemplateType,
+                initialValue: selectedTemplateType,
                 dropdownColor: const Color(0xFF112240),
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(

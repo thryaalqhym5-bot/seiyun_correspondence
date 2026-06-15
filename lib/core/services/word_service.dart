@@ -55,20 +55,39 @@ class WordService {
 
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('جاري تحميل وتجهيز الملف لعرضه داخل النظام...')));
 
-      final docxUrl = data['generated_docx_url'] as String?;
+      String? docxUrl = data['generated_docx_url'] as String?;
+      String? pdfUrl;
+      
       if (docxUrl == null || docxUrl.isEmpty) {
+        if (data['attachments'] != null && (data['attachments'] as List).isNotEmpty) {
+           pdfUrl = data['attachments'].first['url'] as String?;
+        }
+      }
+
+      if ((docxUrl == null || docxUrl.isEmpty) && (pdfUrl == null || pdfUrl.isEmpty)) {
         throw 'لا يوجد ملف مرفق مع هذه المخاطبة (ربما تم إنشاؤها يدوياً)';
       }
 
-      final ref = FirebaseStorage.instance.refFromURL(docxUrl);
-      final bytes = await ref.getData(15 * 1024 * 1024);
-      if (bytes == null) throw 'فشل تحميل المستند من الخادم';
+      File pdfFile;
+      if (pdfUrl != null && pdfUrl.isNotEmpty) {
+         final ref = FirebaseStorage.instance.refFromURL(pdfUrl);
+         final bytes = await ref.getData(15 * 1024 * 1024);
+         if (bytes == null) throw 'فشل تحميل المستند من الخادم';
 
-      final dir = await getApplicationDocumentsDirectory();
-      final docxFile = File('${dir.path}/downloaded_$communicationId.docx');
-      await docxFile.writeAsBytes(bytes);
+         final dir = await getApplicationDocumentsDirectory();
+         pdfFile = File('${dir.path}/downloaded_pdf_$communicationId.pdf');
+         await pdfFile.writeAsBytes(bytes);
+      } else {
+         final ref = FirebaseStorage.instance.refFromURL(docxUrl!);
+         final bytes = await ref.getData(15 * 1024 * 1024);
+         if (bytes == null) throw 'فشل تحميل المستند من الخادم';
 
-      final pdfFile = await convertDocxToPdf(docxFile);
+         final dir = await getApplicationDocumentsDirectory();
+         final docxFile = File('${dir.path}/downloaded_$communicationId.docx');
+         await docxFile.writeAsBytes(bytes);
+
+         pdfFile = await convertDocxToPdf(docxFile);
+      }
 
       // --- Apply Security Features (Watermark & QR) ---
       final currentUser = FirebaseAuth.instance.currentUser;
@@ -125,20 +144,38 @@ class WordService {
       if (localPath.isNotEmpty && File(localPath).existsSync()) {
         sourcePdf = File(localPath);
       } else {
-        final docxUrl = data['generated_docx_url'] as String?;
+        String? docxUrl = data['generated_docx_url'] as String?;
+        String? pdfUrl;
+        
         if (docxUrl == null || docxUrl.isEmpty) {
+          if (data['attachments'] != null && (data['attachments'] as List).isNotEmpty) {
+             pdfUrl = data['attachments'].first['url'] as String?;
+          }
+        }
+
+        if ((docxUrl == null || docxUrl.isEmpty) && (pdfUrl == null || pdfUrl.isEmpty)) {
           throw 'لا يوجد ملف مرفق مع هذه المخاطبة.';
         }
 
-        final ref = FirebaseStorage.instance.refFromURL(docxUrl);
-        final bytes = await ref.getData(15 * 1024 * 1024);
-        if (bytes == null) throw 'فشل تحميل المستند من الخادم';
+        if (pdfUrl != null && pdfUrl.isNotEmpty) {
+           final ref = FirebaseStorage.instance.refFromURL(pdfUrl);
+           final bytes = await ref.getData(15 * 1024 * 1024);
+           if (bytes == null) throw 'فشل تحميل المستند من الخادم';
 
-        final dir = await getApplicationDocumentsDirectory();
-        final docxFile = File('${dir.path}/downloaded_$communicationId.docx');
-        await docxFile.writeAsBytes(bytes);
+           final dir = await getApplicationDocumentsDirectory();
+           sourcePdf = File('${dir.path}/downloaded_pdf_$communicationId.pdf');
+           await sourcePdf.writeAsBytes(bytes);
+        } else {
+           final ref = FirebaseStorage.instance.refFromURL(docxUrl!);
+           final bytes = await ref.getData(15 * 1024 * 1024);
+           if (bytes == null) throw 'فشل تحميل المستند من الخادم';
 
-        sourcePdf = await convertDocxToPdf(docxFile);
+           final dir = await getApplicationDocumentsDirectory();
+           final docxFile = File('${dir.path}/downloaded_$communicationId.docx');
+           await docxFile.writeAsBytes(bytes);
+
+           sourcePdf = await convertDocxToPdf(docxFile);
+        }
       }
 
       final securedPdf = await PdfSecurityUtils.applySecurityFeatures(

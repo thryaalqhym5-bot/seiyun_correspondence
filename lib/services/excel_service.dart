@@ -70,12 +70,12 @@ class ExcelService {
           var rows = tableObj.rows;
           
           String getCellStringSafe(int r, int c) {
-            if (r >= rows.length || c >= rows[r].length || rows[r][c] == null) return '';
+            if (r >= rows.length || c >= rows[r].length || rows[r][c] == null) { return ''; }
             var val = rows[r][c]?.value;
-            if (val == null) return ''; 
-            if (val is TextCellValue) return val.value.text ?? '';
-            if (val is IntCellValue) return val.value.toString();
-            if (val is DoubleCellValue) return val.value.toString();
+            if (val == null) { return ''; }
+            if (val is TextCellValue) { return val.value.text ?? ''; }
+            if (val is IntCellValue) { return val.value.toString(); }
+            if (val is DoubleCellValue) { return val.value.toString(); }
             return val.toString();
           }
 
@@ -85,7 +85,7 @@ class ExcelService {
             bool foundHeaderRow = false;
             for (int c = 0; c < rows[r].length; c++) {
               String cellValue = getCellStringSafe(r, c).trim();
-              if (cellValue.isEmpty) continue;
+              if (cellValue.isEmpty) { continue; }
               if (cellValue == 'الاسم' || cellValue.contains('الاسم')) { nameIdx = c; foundHeaderRow = true; }
               else if (cellValue.contains('اللقب')) { titleIdx = c; foundHeaderRow = true; }
               else if (cellValue == 'القسم' || cellValue.contains('القسم')) { deptIdx = c; foundHeaderRow = true; }
@@ -96,15 +96,15 @@ class ExcelService {
           
           for (int i = 1; i < rows.length; i++) {
             var row = rows[i];
-            if (row.isEmpty) continue;
+            if (row.isEmpty) { continue; }
 
             String getCellString(int index) {
-              if (index >= row.length || row[index] == null) return '';
+              if (index >= row.length || row[index] == null) { return ''; }
               var val = row[index]?.value;
-              if (val == null) return ''; 
-              if (val is TextCellValue) return val.value.text ?? '';
-              if (val is IntCellValue) return val.value.toString();
-              if (val is DoubleCellValue) return val.value.toString();
+              if (val == null) { return ''; }
+              if (val is TextCellValue) { return val.value.text ?? ''; }
+              if (val is IntCellValue) { return val.value.toString(); }
+              if (val is DoubleCellValue) { return val.value.toString(); }
               return val.toString();
             }
 
@@ -119,10 +119,10 @@ class ExcelService {
             }
             
             String adminTitle = getCellString(titleIdx).trim();
-            if (adminTitle.isEmpty) adminTitle = 'staff';
+            if (adminTitle.isEmpty) { adminTitle = 'staff'; }
             
             String deptName = getCellString(deptIdx).trim();
-            if (deptName.isEmpty) deptName = 'قسم عام';
+            if (deptName.isEmpty) { deptName = 'قسم عام'; }
 
             if (!departmentRefs.containsKey(deptName)) {
               String uniqueDeptId = '${collegeName}_$deptName';
@@ -304,7 +304,7 @@ class ExcelService {
       onProgress('تم استيراد بيانات $totalAdded قيادي بنجاح!');
     } catch (e) {
       onProgress('حدث خطأ أثناء رفع ملف القيادات: $e');
-      throw e;
+      rethrow;
     }
   }
 

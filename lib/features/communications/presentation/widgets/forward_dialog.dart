@@ -83,58 +83,60 @@ class _ForwardDialogState extends State<ForwardDialog> {
       title: const Text('تحويل المخاطبة (إحالة)', style: TextStyle(color: Colors.white)),
       content: SizedBox(
         width: 400,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('اختر الموظف أو القسم:', style: TextStyle(color: Colors.white70, fontSize: 14)),
-            const SizedBox(height: 8),
-            _isLoadingUsers
-                ? const Center(child: CircularProgressIndicator())
-                : DropdownButtonFormField<String>(
-                    dropdownColor: const Color(0xFF0A192F),
-                    style: const TextStyle(color: Colors.white),
-                    decoration: const InputDecoration(
-                      enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
-                      focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.blueAccent)),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('اختر الموظف أو القسم:', style: TextStyle(color: Colors.white70, fontSize: 14)),
+              const SizedBox(height: 8),
+              _isLoadingUsers
+                  ? const Center(child: CircularProgressIndicator())
+                  : DropdownButtonFormField<String>(
+                      dropdownColor: const Color(0xFF0A192F),
+                      style: const TextStyle(color: Colors.white),
+                      decoration: const InputDecoration(
+                        enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
+                        focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.blueAccent)),
+                      ),
+                      items: _users.map((doc) {
+                        final data = doc.data() as Map<String, dynamic>;
+                        final id = doc.id;
+                        final name = data['full_name'] ?? 'مجهول';
+                        final title = data['administrative_title'] ?? 'staff';
+                        return DropdownMenuItem(
+                          value: id,
+                          child: Text('$name ($title)'),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val == null) return;
+                        final selectedDoc = _users.firstWhere((doc) => doc.id == val);
+                        final data = selectedDoc.data() as Map<String, dynamic>;
+                        setState(() {
+                          _selectedUserId = val;
+                          _selectedUserName = data['full_name'] ?? 'مجهول';
+                          _selectedUserDeptId = data['dept_id'] ?? '';
+                        });
+                      },
+                      hint: const Text('اختر من القائمة...', style: TextStyle(color: Colors.white54)),
                     ),
-                    items: _users.map((doc) {
-                      final data = doc.data() as Map<String, dynamic>;
-                      final id = doc.id;
-                      final name = data['full_name'] ?? 'مجهول';
-                      final title = data['administrative_title'] ?? 'staff';
-                      return DropdownMenuItem(
-                        value: id,
-                        child: Text('$name ($title)'),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      if (val == null) return;
-                      final selectedDoc = _users.firstWhere((doc) => doc.id == val);
-                      final data = selectedDoc.data() as Map<String, dynamic>;
-                      setState(() {
-                        _selectedUserId = val;
-                        _selectedUserName = data['full_name'] ?? 'مجهول';
-                        _selectedUserDeptId = data['dept_id'] ?? '';
-                      });
-                    },
-                    hint: const Text('اختر من القائمة...', style: TextStyle(color: Colors.white54)),
-                  ),
-            const SizedBox(height: 16),
-            const Text('التوجيه / الإفادة (اختياري):', style: TextStyle(color: Colors.white70, fontSize: 14)),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _commentController,
-              style: const TextStyle(color: Colors.white),
-              maxLines: 3,
-              decoration: const InputDecoration(
-                hintText: 'اكتب توجيهك هنا...',
-                hintStyle: TextStyle(color: Colors.white54),
-                enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
-                focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.blueAccent)),
+              const SizedBox(height: 16),
+              const Text('التوجيه / الإفادة (اختياري):', style: TextStyle(color: Colors.white70, fontSize: 14)),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _commentController,
+                style: const TextStyle(color: Colors.white),
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  hintText: 'اكتب توجيهك هنا...',
+                  hintStyle: TextStyle(color: Colors.white54),
+                  enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
+                  focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.blueAccent)),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
       actions: [

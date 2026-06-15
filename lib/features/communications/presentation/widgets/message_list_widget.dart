@@ -8,6 +8,7 @@ class MessageListWidget extends StatefulWidget {
   final Function(CommunicationModel) onSelect;
   final String title;
   final IconData emptyIcon;
+  final bool isOutbox;
 
   const MessageListWidget({
     super.key,
@@ -16,6 +17,7 @@ class MessageListWidget extends StatefulWidget {
     required this.onSelect,
     required this.title,
     required this.emptyIcon,
+    this.isOutbox = false,
   });
 
   @override
@@ -111,7 +113,9 @@ class _MessageListWidgetState extends State<MessageListWidget> {
                       final isSelected = widget.selectedMessage?.id == message.id;
                       final isUrgent = message.priority == 'urgent';
 
-                      final displayName = message.type == 'outgoing' ? 'إلى: ${message.targetName}' : message.senderName;
+                      final displayName = widget.isOutbox 
+                          ? 'إلى: ${message.targetName}' 
+                          : message.senderName;
                       final accentColor = message.type == 'outgoing' ? AppColors.success : AppColors.primary;
 
                       final isUnread = !message.isRead && message.type != 'outgoing';
@@ -143,9 +147,17 @@ class _MessageListWidgetState extends State<MessageListWidget> {
                                       const SizedBox(width: 8),
                                       _buildBadge('جديد', Colors.blueAccent),
                                     ],
+                                    if (message.isDelegated) ...[
+                                      const SizedBox(width: 8),
+                                      _buildBadge('مُفوضة', Colors.purpleAccent),
+                                    ],
                                     if (isUrgent) ...[
                                       const SizedBox(width: 8),
                                       _buildBadge('عاجل', AppColors.danger),
+                                    ],
+                                    if (message.isLate) ...[
+                                      const SizedBox(width: 8),
+                                      _buildBadge('متأخرة', Colors.redAccent),
                                     ],
                                     if (message.parentCommId != null && message.parentCommId!.isNotEmpty) ...[
                                       const SizedBox(width: 6),
@@ -169,6 +181,10 @@ class _MessageListWidgetState extends State<MessageListWidget> {
                                     if (message.isExternal) ...[
                                       const SizedBox(width: 6),
                                       _buildBadge('خارجي', Colors.orangeAccent),
+                                    ],
+                                    if (message.type == 'draft_request') ...[
+                                      const SizedBox(width: 6),
+                                      _buildBadge('طلب صياغة', Colors.deepPurpleAccent),
                                     ],
                                   ],
                                 ),

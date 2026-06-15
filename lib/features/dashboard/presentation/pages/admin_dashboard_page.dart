@@ -11,6 +11,10 @@ import 'admin_upload_page.dart';
 import 'admin_archive_management_page.dart';
 import '../../../../core/widgets/dashboard_layout.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/models/user_model.dart';
+import '../widgets/add_user_dialog.dart';
+import '../widgets/edit_user_dialog.dart';
+import '../widgets/profile_settings_dialog.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   final String fullName;
@@ -186,6 +190,19 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       userName: widget.fullName,
       role: 'مدير النظام',
       onLogout: _handleLogout,
+      onSettings: () async {
+        final uid = FirebaseAuth.instance.currentUser?.uid;
+        if (uid != null) {
+          final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+          if (doc.exists && mounted) {
+            final userModel = UserModel.fromJson(doc.data()!, uid);
+            showDialog(
+              context: context,
+              builder: (context) => ProfileSettingsDialog(currentUser: userModel),
+            );
+          }
+        }
+      },
       items: [
         SidebarItem(title: 'الرئيسية', icon: Icons.dashboard),
         SidebarItem(title: 'المستخدمين', icon: Icons.people_outline),

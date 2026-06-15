@@ -44,6 +44,7 @@ class CommunicationModel {
   final String? senderDeptId;
   final bool isCircular;
   final bool isExternalOutgoing;
+  bool isDelegated;
 
   CommunicationModel({
     this.id,
@@ -82,6 +83,7 @@ class CommunicationModel {
     this.senderDeptId,
     this.isCircular = false,
     this.isExternalOutgoing = false,
+    this.isDelegated = false,
   });
 
   factory CommunicationModel.fromJson(Map<String, dynamic> json, [String? docId]) {
@@ -122,6 +124,7 @@ class CommunicationModel {
       senderDeptId: json['sender_dept_id'] as String?,
       isCircular: json['is_circular'] as bool? ?? false,
       isExternalOutgoing: json['is_external_outgoing'] as bool? ?? false,
+      isDelegated: json['is_delegated'] as bool? ?? false,
     );
   }
 
@@ -162,6 +165,50 @@ class CommunicationModel {
       if (senderDeptId != null) 'sender_dept_id': senderDeptId,
       'is_circular': isCircular,
       'is_external_outgoing': isExternalOutgoing,
+      'is_delegated': isDelegated,
     };
+  }
+
+  bool get isLate {
+    if (createdAt == null) return false;
+    // إذا كانت المعاملة منجزة أو مؤرشفة فلا تعتبر متأخرة
+    if (status == 'archived' || status == 'completed' || status == 'مكتملة' || status == 'مؤرشفة') {
+      return false;
+    }
+
+    final now = DateTime.now();
+    final difference = now.difference(createdAt!);
+
+    if (priority == 'urgent' || priority == 'عاجل') {
+      return difference.inHours >= 24;
+    } else {
+      return difference.inHours >= 48;
+    }
+  }
+
+  String get statusAr {
+    switch (status) {
+      case 'draft_requested': return 'مطلوب صياغتها';
+      case 'draft': return 'مسودة';
+      case 'pending': return 'مجهزة للاعتماد';
+      case 'approved': return 'معتمدة';
+      case 'returned_for_edit': return 'معادة للتعديل';
+      case 'processing': return 'قيد المعالجة';
+      case 'completed': return 'منجزة';
+      case 'archived': return 'مؤرشفة';
+      case 'rejected': return 'مرفوضة';
+      default: return status;
+    }
+  }
+
+  String get typeAr {
+    switch (type) {
+      case 'draft_request': return 'طلب صياغة';
+      case 'internal': return 'مخاطبة داخلية';
+      case 'outgoing': return 'مراسلة صادرة';
+      case 'incoming': return 'مراسلة واردة';
+      case 'circular': return 'تعميم';
+      default: return type;
+    }
   }
 }

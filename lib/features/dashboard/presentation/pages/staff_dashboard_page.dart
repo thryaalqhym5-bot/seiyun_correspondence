@@ -23,6 +23,7 @@ import '../../../communications/presentation/pages/secretary_dispatch_page.dart'
 import '../../../communications/presentation/pages/returned_drafts_page.dart';
 import 'secretary_external_archive_page.dart';
 import '../../../../core/widgets/dashboard_layout.dart';
+import '../widgets/profile_settings_dialog.dart';
 import '../../../../core/services/communication_service.dart';
 import '../../../communications/presentation/pages/external_inbox_page.dart';
 import '../../../communications/data/communications_repository.dart';
@@ -248,6 +249,7 @@ class _StaffDashboardPageState extends State<StaffDashboardPage> {
       SidebarItem(title: 'الرئيسية', icon: Icons.dashboard),
       SidebarItem(title: 'إنشاء مخاطبة', icon: Icons.create),
       SidebarItem(title: 'الوارد', icon: Icons.inbox),
+      SidebarItem(title: 'صندوق التفويضات', icon: Icons.forward_to_inbox),
       SidebarItem(title: 'الصادر', icon: Icons.send),
     ];
 
@@ -298,6 +300,14 @@ class _StaffDashboardPageState extends State<StaffDashboardPage> {
       userName: widget.fullName,
       role: userTitle,
       onLogout: _handleLogout,
+      onSettings: () {
+        if (currentUserModel != null) {
+          showDialog(
+            context: context,
+            builder: (context) => ProfileSettingsDialog(currentUser: currentUserModel!),
+          );
+        }
+      },
       items: items,
       child: _buildBody(items),
     );
@@ -891,6 +901,28 @@ class _StaffDashboardPageState extends State<StaffDashboardPage> {
                     onWorkspaceChanged: _switchWorkspace,
                   ),
                 ],
+                const SizedBox(width: 32),
+                _buildNotificationsBell(),
+                const SizedBox(width: 16),
+                Container(
+                  decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: primaryAccent.withValues(alpha: 0.5), width: 2)),
+                  child: CircleAvatar(
+                    radius: 20,
+                    backgroundColor: const Color(0xFF112240),
+                    child: IconButton(
+                      icon: const Icon(Icons.settings, color: Colors.white70, size: 20),
+                      tooltip: 'الإعدادات',
+                      onPressed: () {
+                        if (currentUserModel != null) {
+                          showDialog(
+                            context: context,
+                            builder: (context) => ProfileSettingsDialog(currentUser: currentUserModel!),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                ),
               ],
             ),
           ],
@@ -913,46 +945,6 @@ class _StaffDashboardPageState extends State<StaffDashboardPage> {
                   SizedBox(width: 8),
                   Text('البحث العالمي...', style: TextStyle(color: Colors.white38, fontSize: 13)),
                 ],
-              ),
-            ),
-            _buildNotificationsBell(),
-            const SizedBox(width: 16),
-            PopupMenuButton<String>(
-              offset: const Offset(0, 50),
-              tooltip: 'خيارات المستخدم',
-              onSelected: (value) {
-                if (value == 'signature') {
-                  _handleSetupSignature(signatureUrl != null);
-                } else if (value == 'logout') {
-                  _handleLogout();
-                }
-              },
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                  value: 'signature',
-                  child: Row(
-                    children: [
-                      Icon(Icons.draw, color: signatureUrl != null ? Colors.green : Colors.blueAccent),
-                      const SizedBox(width: 8),
-                      Text(signatureUrl != null ? 'تعديل التوقيع' : 'إعداد التوقيع'),
-                    ],
-                  ),
-                ),
-                const PopupMenuDivider(),
-                const PopupMenuItem(
-                  value: 'logout',
-                  child: Row(
-                    children: [
-                      Icon(Icons.logout, color: Colors.redAccent),
-                      const SizedBox(width: 8),
-                      Text('تسجيل الخروج'),
-                    ],
-                  ),
-                ),
-              ],
-              child: Container(
-                decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: primaryAccent.withValues(alpha: 0.5), width: 2)),
-                child: const CircleAvatar(radius: 20, backgroundColor: Color(0xFF112240), child: Icon(Icons.person, color: Colors.white70, size: 20)),
               ),
             ),
           ],

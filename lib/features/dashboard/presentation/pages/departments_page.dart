@@ -206,11 +206,13 @@ class _DepartmentsPageState extends State<DepartmentsPage> {
           title: const Text('تعديل اسم القسم', style: TextStyle(color: Colors.white)),
           content: SizedBox(
             width: 400,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CustomTextField(controller: nameController, labelText: 'اسم القسم الجديد'),
-              ],
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CustomTextField(controller: nameController, labelText: 'اسم القسم الجديد'),
+                ],
+              ),
             ),
           ),
           actions: [

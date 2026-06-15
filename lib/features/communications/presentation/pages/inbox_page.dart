@@ -10,7 +10,8 @@ import '../widgets/message_list_widget.dart';
 import '../widgets/message_detail_widget.dart';
 
 class InboxPage extends StatefulWidget {
-  const InboxPage({super.key});
+  final bool isDelegated;
+  const InboxPage({super.key, this.isDelegated = false});
 
   @override
   State<InboxPage> createState() => _InboxPageState();
@@ -69,7 +70,7 @@ class _InboxPageState extends State<InboxPage> {
                 Expanded(
                   flex: 2,
                   child: StreamBuilder<List<CommunicationModel>>(
-                    stream: _viewModel.getInboxStream(),
+                    stream: widget.isDelegated ? _viewModel.getDelegatedInboxStream() : _viewModel.getInboxStream(),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const Center(child: CircularProgressIndicator(color: AppColors.primary));
@@ -84,7 +85,7 @@ class _InboxPageState extends State<InboxPage> {
                         animation: _viewModel,
                         builder: (context, child) {
                           return MessageListWidget(
-                            title: 'صندوق الوارد',
+                            title: widget.isDelegated ? 'صندوق التفويضات' : 'صندوق الوارد',
                             emptyIcon: Icons.inbox_outlined,
                             messages: messages,
                             selectedMessage: _viewModel.selectedMessage,

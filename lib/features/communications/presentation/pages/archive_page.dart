@@ -20,6 +20,7 @@ class _ArchivePageState extends State<ArchivePage> {
 
   String _searchQuery = '';
   String _selectedType = 'all';
+  String _selectedStatus = 'all';
   DateTime? _selectedDate;
 
   @override
@@ -152,21 +153,19 @@ class _ArchivePageState extends State<ArchivePage> {
         // Type filter
         bool matchesType = _selectedType == 'all' || type == _selectedType;
             
-        // Date filter
-        bool matchesDate = true;
-        if (_selectedDate != null) {
-          Timestamp? archivedAt = doc['archived_at'] ?? doc['created_at'];
-          if (archivedAt != null) {
-             final dt = archivedAt.toDate();
-             if (dt.year != _selectedDate!.year || dt.month != _selectedDate!.month || dt.day != _selectedDate!.day) {
-                matchesDate = false;
-             }
-          } else {
-             matchesDate = false;
-          }
-        }
+        // Status filter
+        bool matchesStatus = _selectedStatus == 'all' || (doc['status'] == _selectedStatus);
 
-        return matchesSearch && matchesType && matchesDate;
+        // Date filter
+        Timestamp? ts = doc['archived_at'] ?? doc['created_at'];
+        DateTime? date = ts?.toDate();
+        final matchesDate = _selectedDate == null ||
+            (date != null &&
+             date.year == _selectedDate!.year &&
+             date.month == _selectedDate!.month &&
+             date.day == _selectedDate!.day);
+             
+        return matchesSearch && matchesType && matchesStatus && matchesDate;
       }).toList();
     });
   }
@@ -261,7 +260,7 @@ class _ArchivePageState extends State<ArchivePage> {
                   children: [
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        value: _selectedType,
+                        initialValue: _selectedType,
                         dropdownColor: const Color(0xFF112240),
                         style: const TextStyle(color: Colors.white),
                         decoration: InputDecoration(
@@ -284,7 +283,33 @@ class _ArchivePageState extends State<ArchivePage> {
                         },
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        initialValue: _selectedStatus,
+                        dropdownColor: const Color(0xFF112240),
+                        style: const TextStyle(color: Colors.white),
+                        decoration: InputDecoration(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                          filled: true,
+                          fillColor: Colors.white.withValues(alpha: 0.05),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 'all', child: Text('جميع الحالات')),
+                          DropdownMenuItem(value: 'مؤرشفة', child: Text('مؤرشفة')),
+                          DropdownMenuItem(value: 'قيد المعالجة', child: Text('قيد المعالجة')),
+                          DropdownMenuItem(value: 'مكتملة', child: Text('مكتملة')),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() => _selectedStatus = val);
+                            _applyFilters();
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     InkWell(
                       onTap: () => _selectDate(context),
                       borderRadius: BorderRadius.circular(12),

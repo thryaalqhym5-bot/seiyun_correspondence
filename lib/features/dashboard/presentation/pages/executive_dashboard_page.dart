@@ -18,6 +18,7 @@ import 'delegation_management_page.dart';
 import '../../../../core/services/communication_service.dart';
 import '../widgets/signature_setup_dialog.dart';
 import 'academic_vp_emails_page.dart';
+import '../widgets/profile_settings_dialog.dart';
 
 class ExecutiveDashboardPage extends StatefulWidget {
   final String fullName;
@@ -201,6 +202,14 @@ class _ExecutiveDashboardPageState extends State<ExecutiveDashboardPage> {
       userName: widget.fullName,
       role: widget.role,
       onLogout: _handleLogout,
+      onSettings: () {
+        if (currentUserModel != null) {
+          showDialog(
+            context: context,
+            builder: (context) => ProfileSettingsDialog(currentUser: currentUserModel!),
+          );
+        }
+      },
       items: items,
       child: Container(
         color: darkBlueBg,
@@ -287,75 +296,48 @@ class _ExecutiveDashboardPageState extends State<ExecutiveDashboardPage> {
                     onWorkspaceChanged: _switchWorkspace,
                   ),
                 ],
-              ],
-            ),
-          ],
-        ),
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: surfaceColor, shape: BoxShape.circle, border: Border.all(color: goldAccent.withValues(alpha: 0.3))),
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Icon(Icons.notifications_active, color: goldAccent, size: 24),
-                  if (urgentCount > 0)
-                    Positioned(
-                      right: -5,
-                      top: -5,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                        child: Text('$urgentCount', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                      ),
+                const SizedBox(width: 32),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: surfaceColor, shape: BoxShape.circle, border: Border.all(color: goldAccent.withValues(alpha: 0.3))),
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Icon(Icons.notifications_active, color: goldAccent, size: 24),
+                      if (urgentCount > 0)
+                        Positioned(
+                          right: -5,
+                          top: -5,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                            child: Text('$urgentCount', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Container(
+                  decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: goldAccent.withValues(alpha: 0.5), width: 2)),
+                  child: CircleAvatar(
+                    radius: 20,
+                    backgroundColor: const Color(0xFF112240),
+                    child: IconButton(
+                      icon: const Icon(Icons.settings, color: Colors.white70, size: 20),
+                      tooltip: 'الإعدادات',
+                      onPressed: () {
+                        if (currentUserModel != null) {
+                          showDialog(
+                            context: context,
+                            builder: (context) => ProfileSettingsDialog(currentUser: currentUserModel!),
+                          );
+                        }
+                      },
                     ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 16),
-            PopupMenuButton<String>(
-              offset: const Offset(0, 50),
-              tooltip: 'خيارات المستخدم',
-              onSelected: (value) {
-                if (value == 'logout') {
-                  _handleLogout();
-                } else if (value == 'signature') {
-                  showDialog(
-                    context: context,
-                    builder: (context) => const SignatureSetupDialog(),
-                  ).then((_) {
-                    // Refresh data after signature upload if needed
-                    _loadStats();
-                  });
-                }
-              },
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                  value: 'signature',
-                  child: Row(
-                    children: [
-                      Icon(Icons.draw, color: Colors.blueAccent),
-                      const SizedBox(width: 8),
-                      const Text('إضافة توقيع'),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'logout',
-                  child: Row(
-                    children: [
-                      Icon(Icons.logout, color: Colors.redAccent),
-                      const SizedBox(width: 8),
-                      Text('تسجيل الخروج'),
-                    ],
                   ),
                 ),
               ],
-              child: Container(
-                decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: goldAccent.withValues(alpha: 0.5), width: 2)),
-                child: const CircleAvatar(radius: 20, backgroundColor: Color(0xFF112240), child: Icon(Icons.person, color: Colors.white70, size: 20)),
-              ),
             ),
           ],
         ),

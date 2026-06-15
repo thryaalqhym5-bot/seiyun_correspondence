@@ -57,6 +57,7 @@ class _OutboxPageState extends State<OutboxPage> {
                             messages: messages,
                             selectedMessage: _viewModel.selectedMessage,
                             onSelect: _viewModel.selectMessage,
+                            isOutbox: true,
                           );
                         },
                       );

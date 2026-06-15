@@ -600,10 +600,11 @@ class _ExternalInboxPageState extends State<ExternalInboxPage> {
           ),
           content: SizedBox(
             width: 450,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                 const Text('اختر الشخص المعني:',
                     style: TextStyle(color: Colors.white70, fontSize: 14)),
                 const SizedBox(height: 8),
@@ -657,6 +658,7 @@ class _ExternalInboxPageState extends State<ExternalInboxPage> {
                 ),
               ],
             ),
+          ),
           ),
           actions: [
             TextButton(
@@ -743,15 +745,16 @@ class _ExternalInboxPageState extends State<ExternalInboxPage> {
           ),
           content: SizedBox(
             width: 400,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text('نطاق التعميم:',
                     style: TextStyle(color: Colors.white70, fontSize: 14)),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
-                  value: targetGroup,
+                  initialValue: targetGroup,
                   dropdownColor: AppColors.surface,
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
@@ -785,6 +788,7 @@ class _ExternalInboxPageState extends State<ExternalInboxPage> {
                 ),
               ],
             ),
+          ),
           ),
           actions: [
             TextButton(

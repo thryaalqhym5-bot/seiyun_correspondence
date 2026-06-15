@@ -19,7 +19,7 @@ class _AddUserDialogState extends State<AddUserDialog> {
 
   String selectedRole = 'staff';
   String? selectedManagerId;
-  List<Map<String, dynamic>> _affiliations = [
+  final List<Map<String, dynamic>> _affiliations = [
     {
       'college_id': '',
       'dept_id': '',
@@ -186,7 +186,7 @@ class _AddUserDialogState extends State<AddUserDialog> {
                             if (!snapshot.hasData) return const CircularProgressIndicator();
                             final docs = snapshot.data!.docs;
                             return DropdownButtonFormField<String>(
-                              value: docs.any((doc) => doc.id == aff['college_id']) ? aff['college_id'] : '',
+                              initialValue: docs.any((doc) => doc.id == aff['college_id']) ? aff['college_id'] : '',
                               decoration: const InputDecoration(labelText: 'الجهة (رئاسة الجامعة / الكلية)', border: OutlineInputBorder()),
                               dropdownColor: const Color(0xFF112240),
                               style: const TextStyle(color: Colors.white),
@@ -208,7 +208,7 @@ class _AddUserDialogState extends State<AddUserDialog> {
                             if (!snapshot.hasData) return const CircularProgressIndicator();
                             final docs = snapshot.data!.docs;
                             return DropdownButtonFormField<String>(
-                              value: (aff['dept_id'] as String).isEmpty ? '' : (docs.any((doc) => doc.id == aff['dept_id']) ? aff['dept_id'] : null),
+                              initialValue: (aff['dept_id'] as String).isEmpty ? '' : (docs.any((doc) => doc.id == aff['dept_id']) ? aff['dept_id'] : null),
                               decoration: const InputDecoration(labelText: 'القسم (اختياري)', border: OutlineInputBorder()),
                               dropdownColor: const Color(0xFF112240),
                               style: const TextStyle(color: Colors.white),
@@ -225,7 +225,7 @@ class _AddUserDialogState extends State<AddUserDialog> {
                         ),
                         const SizedBox(height: 12),
                         DropdownButtonFormField<String>(
-                          value: aff['administrative_title'],
+                          initialValue: aff['administrative_title'],
                           dropdownColor: const Color(0xFF112240),
                           style: const TextStyle(color: Colors.white),
                           decoration: InputDecoration(
@@ -254,7 +254,7 @@ class _AddUserDialogState extends State<AddUserDialog> {
                         ),
                         const SizedBox(height: 12),
                         DropdownButtonFormField<String>(
-                          value: aff['secondary_administrative_title'] ?? 'none',
+                          initialValue: aff['secondary_administrative_title'] ?? 'none',
                           dropdownColor: const Color(0xFF112240),
                           style: const TextStyle(color: Colors.white),
                           decoration: InputDecoration(
@@ -277,7 +277,7 @@ class _AddUserDialogState extends State<AddUserDialog> {
               }),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: selectedRole,
+                initialValue: selectedRole,
                 dropdownColor: const Color(0xFF112240),
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
@@ -301,7 +301,7 @@ class _AddUserDialogState extends State<AddUserDialog> {
               if (selectedRole == 'executive_secretary' || (_affiliations.isNotEmpty && _affiliations.first['administrative_title'] == 'secretary')) ...[
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: _managers.any((m) => m['uid'] == selectedManagerId) ? selectedManagerId : null,
+                  initialValue: _managers.any((m) => m['uid'] == selectedManagerId) ? selectedManagerId : null,
                   dropdownColor: const Color(0xFF112240),
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(

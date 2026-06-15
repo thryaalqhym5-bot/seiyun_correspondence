@@ -144,7 +144,7 @@ class _CollegeAddUserDialogState extends State<CollegeAddUserDialog> {
                   if (!snapshot.hasData) return const CircularProgressIndicator();
                   final docs = snapshot.data!.docs;
                   return DropdownButtonFormField<String>(
-                    value: deptIdController.text.isEmpty ? null : deptIdController.text,
+                    initialValue: deptIdController.text.isEmpty ? null : deptIdController.text,
                     decoration: const InputDecoration(labelText: 'القسم (اختياري)', border: OutlineInputBorder()),
                     dropdownColor: const Color(0xFF112240),
                     style: const TextStyle(color: Colors.white),
@@ -161,7 +161,7 @@ class _CollegeAddUserDialogState extends State<CollegeAddUserDialog> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: selectedAdminTitle,
+                initialValue: selectedAdminTitle,
                 dropdownColor: const Color(0xFF112240),
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
@@ -182,7 +182,7 @@ class _CollegeAddUserDialogState extends State<CollegeAddUserDialog> {
               if (selectedAdminTitle == 'secretary') ...[
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
-                  value: selectedManagerId,
+                  initialValue: selectedManagerId,
                   dropdownColor: const Color(0xFF112240),
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(

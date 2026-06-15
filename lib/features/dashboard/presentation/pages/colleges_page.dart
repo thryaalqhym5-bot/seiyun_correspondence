@@ -121,27 +121,29 @@ class _CollegesPageState extends State<CollegesPage> {
           title: const Text('إضافة جهة/كلية جديدة', style: TextStyle(color: Colors.white)),
           content: SizedBox(
             width: 400,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CustomTextField(
-                  controller: collegeIdController,
-                  labelText: 'معرف الكلية الإنجليزي (مثال: eng_college)',
-                  prefixIcon: Icons.code,
-                ),
-                const SizedBox(height: 16),
-                CustomTextField(
-                  controller: collegeNameController,
-                  labelText: 'اسم الكلية أو الجهة',
-                  prefixIcon: Icons.account_balance,
-                ),
-                const SizedBox(height: 16),
-                CustomTextField(
-                  controller: entityCodeController,
-                  labelText: 'رمز الأرشيف (مثال: 01)',
-                  prefixIcon: Icons.archive,
-                ),
-              ],
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CustomTextField(
+                    controller: collegeIdController,
+                    labelText: 'معرف الكلية الإنجليزي (مثال: eng_college)',
+                    prefixIcon: Icons.code,
+                  ),
+                  const SizedBox(height: 16),
+                  CustomTextField(
+                    controller: collegeNameController,
+                    labelText: 'اسم الكلية أو الجهة',
+                    prefixIcon: Icons.account_balance,
+                  ),
+                  const SizedBox(height: 16),
+                  CustomTextField(
+                    controller: entityCodeController,
+                    labelText: 'رمز الأرشيف (مثال: 01)',
+                    prefixIcon: Icons.archive,
+                  ),
+                ],
+              ),
             ),
           ),
           actions: [

@@ -8,6 +8,7 @@ import '../../../../data/services/local_storage_service.dart';
 import '../../../dashboard/presentation/pages/admin_dashboard_page.dart';
 import '../../../dashboard/presentation/pages/staff_dashboard_page.dart';
 import '../../../dashboard/presentation/pages/executive_dashboard_page.dart';
+import 'inquiry_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -385,6 +386,14 @@ class _LoginPageState extends State<LoginPage> {
                                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                                 ),
                         ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextButton.icon(
+                        onPressed: () {
+                          Navigator.push(context, MaterialPageRoute(builder: (context) => const InquiryPage()));
+                        },
+                        icon: const Icon(Icons.qr_code_scanner, color: Colors.white70),
+                        label: const Text('استعلام عن صحة وثيقة', style: TextStyle(color: Colors.white70, decoration: TextDecoration.underline)),
                       ),
                     ],
                   ),

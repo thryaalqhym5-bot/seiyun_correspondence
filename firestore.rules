@@ -122,9 +122,10 @@ service cloud.firestore {
 
       // سجل التتبع (Tracking Subcollection)
       match /tracking/{trackingId} {
-        allow read: if isCommunicationParticipant(
-          get(/databases/$(database)/documents/communications/$(commId)).data
-        );
+        allow read: if isExecutive() ||
+          isCommunicationParticipant(get(/databases/$(database)/documents/communications/$(commId)).data) ||
+          (get(/databases/$(database)/documents/communications/$(commId)).data.is_circular == true && get(/databases/$(database)/documents/communications/$(commId)).data.status == 'published') ||
+          (get(/databases/$(database)/documents/communications/$(commId)).data.is_external_outgoing == true && isCollegeSecretary(get(/databases/$(database)/documents/communications/$(commId)).data.sender_college_id));
         allow create: if isAuthenticated() && request.resource.data.from_id == request.auth.uid;
       }
     }

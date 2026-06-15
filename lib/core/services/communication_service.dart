@@ -435,10 +435,18 @@ class CommunicationService {
     await batch.commit();
 
     if (!isCircular && actualRcvId.isNotEmpty && actualRcvId != 'external_entity') {
+      String notifTitle = 'رسالة واردة جديدة';
+      String notifBody = 'وصلتك رسالة جديدة من $effectiveSenderName بعنوان: $subject';
+      
+      if (actualStatus == 'pending') {
+        notifTitle = 'مسودة مجهزة للاعتماد';
+        notifBody = 'قام $effectiveSenderName بتجهيز مسودة ( $subject ) وهي بانتظار اعتمادك.';
+      }
+
       await NotificationService().sendNotification(
         targetUserId: actualRcvId,
-        title: 'رسالة واردة جديدة',
-        body: 'وصلتك رسالة جديدة من $effectiveSenderName بعنوان: $subject',
+        title: notifTitle,
+        body: notifBody,
         type: (securityLevel == 'top_secret' || selectedPriority == 'highly_confidential') ? 'urgent' : 'new_message',
         relatedDocId: commRef.id,
       );

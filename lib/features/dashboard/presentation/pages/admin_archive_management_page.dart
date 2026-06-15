@@ -476,26 +476,28 @@ class _FolderSettingRowState extends State<_FolderSettingRow> {
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF112240),
         title: const Text('⚠️ إعادة تعيين العداد', style: TextStyle(color: Colors.amber)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('هل أنت متأكد من إعادة تعيين العداد التسلسلي؟', style: TextStyle(color: Colors.white, fontSize: 15)),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: Colors.amber.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('العداد الحالي: ${widget.currentSequence}', style: const TextStyle(color: Colors.white70)),
-                  const SizedBox(height: 4),
-                  const Text('سيتم إعادة الترقيم من 1', style: TextStyle(color: Colors.amber)),
-                  const Text('المراسلات السابقة لن تتأثر', style: TextStyle(color: Colors.white54, fontSize: 12)),
-                ],
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('هل أنت متأكد من إعادة تعيين العداد التسلسلي؟', style: TextStyle(color: Colors.white, fontSize: 15)),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: Colors.amber.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('العداد الحالي: ${widget.currentSequence}', style: const TextStyle(color: Colors.white70)),
+                    const SizedBox(height: 4),
+                    const Text('سيتم إعادة الترقيم من 1', style: TextStyle(color: Colors.amber)),
+                    const Text('المراسلات السابقة لن تتأثر', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),

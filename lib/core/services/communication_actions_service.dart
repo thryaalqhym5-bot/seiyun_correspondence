@@ -164,6 +164,17 @@ class CommunicationActionsService {
       toStatus: 'read',
       comment: 'تم فتح وقراءة المراسلة',
     );
+
+    final senderId = data['sender_id']?.toString() ?? '';
+    if (senderId.isNotEmpty && senderId != user.uid) {
+      await NotificationService().sendNotification(
+        targetUserId: senderId,
+        title: 'إشعار بالاطلاع',
+        body: 'قام $userName بالاطلاع على المراسلة',
+        relatedDocId: commId,
+        type: 'read_receipt',
+      );
+    }
   }
 
   // =====================================================
@@ -521,10 +532,6 @@ class CommunicationActionsService {
     final userName = await _getCurrentUserName(user.uid);
     await _requireCurrentRecipient(commId, user.uid);
 
-    await _firestore.collection('communications').doc(commId).update({
-      'updated_at': FieldValue.serverTimestamp(),
-    });
-
     await _addTrackingEntry(
       commId: commId,
       action: 'acknowledge_circular',
@@ -536,6 +543,32 @@ class CommunicationActionsService {
       toStatus: 'acknowledged',
       comment: 'تم العلم بالتعميم',
     );
+
+    final doc = await _firestore.collection('communications').doc(commId).get();
+    final data = doc.data();
+    if (data != null) {
+      String targetId = data['sender_id']?.toString() ?? '';
+      if (data['is_external'] == true) {
+        final pubTracking = await _firestore.collection('communications')
+            .doc(commId).collection('tracking')
+            .where('action', isEqualTo: 'circulate_external')
+            .limit(1)
+            .get();
+        if (pubTracking.docs.isNotEmpty) {
+          targetId = pubTracking.docs.first.data()['from_id']?.toString() ?? targetId;
+        }
+      }
+      
+      if (targetId.isNotEmpty && targetId != user.uid) {
+        await NotificationService().sendNotification(
+          targetUserId: targetId,
+          title: 'إشعار بالاطلاع على تعميم',
+          body: 'قام $userName بالاطلاع على التعميم',
+          relatedDocId: commId,
+          type: 'read_receipt',
+        );
+      }
+    }
   }
 
   /// تعليم مراسلة خارجية كمراجعة

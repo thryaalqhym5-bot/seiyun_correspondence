@@ -10,6 +10,7 @@ class DashboardLayout extends StatefulWidget {
   final String userName;
   final String role;
   final VoidCallback onLogout;
+  final VoidCallback? onSettings;
   final List<SidebarItem> items;
 
   const DashboardLayout({
@@ -20,6 +21,7 @@ class DashboardLayout extends StatefulWidget {
     required this.userName,
     required this.role,
     required this.onLogout,
+    this.onSettings,
     required this.items,
   });
 
